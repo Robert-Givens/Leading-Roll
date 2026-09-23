@@ -5119,8 +5119,17 @@ footer.note{ display:none; }
   };
   function triggerEgg(id){
     if(eggBusy || !EGG_FX[id]) return;
+    const m0 = loadEggs();
+    // Every egg here is a one-time collectible -- meet its trigger condition
+    // again later (three scenes deep in the Silent era rolling snake eyes on
+    // the first roll, say, for "meanwhile") and it used to replay the whole
+    // animation every single time, forever, which is the opposite of a
+    // surprise. 8-bit mode is the one exception: the Konami code is a mode
+    // TOGGLE, not a find, so it's meant to fire (and flip on/off) every time
+    // it's entered, same as before.
+    if(m0[id] && id!=="eight_bit") return;
     eggBusy = true;
-    const m = loadEggs(); const fresh = !m[id]; m[id] = 1; if(id==="eight_bit") m.eightBit = !m.eightBit; saveEggs(m);
+    const m = m0; const fresh = !m[id]; m[id] = 1; if(id==="eight_bit") m.eightBit = !m.eightBit; saveEggs(m);
     popQueue.then(async ()=>{
       try{ await EGG_FX[id](); }catch(e){ const l=eggLayer(); if(l) l.innerHTML=""; }
       const l=eggLayer();
@@ -5846,6 +5855,13 @@ footer.note{ display:none; }
 
   const GENERAL_RANKS = [[10,"General"],[9,"Colonel"],[8,"Captain"],[6,"Lieutenant"],[4,"Sergeant"],[2,"Corporal"],[0,"Private"]];
   let drawerOpen = false;
+  // The Call Sheet drawer doubles as the in-run pause menu -- this just
+  // tracks whether its "Abandon Run" action is mid-confirm (a plain tap
+  // shouldn't be able to forfeit a run, but a native confirm() dialog gets
+  // blocked when this page is embedded in a sandboxed iframe, e.g. viewed
+  // as a Claude Artifact, so the confirm step is a second in-drawer state
+  // instead). Reset alongside drawerOpen -- see render() and wireDrawer().
+  let abandonConfirming = false;
 
   function renderPlay(){
     if(state.rolling) chainGen++; // a new roll cancels any score chain still playing
@@ -6066,7 +6082,12 @@ footer.note{ display:none; }
   }
 
   // Bottom sheet with the detail that used to sit under the table: full
-  // stats, the dice on the lot, and the roll log.
+  // stats, the dice on the lot, the roll log -- and doubling as the in-run
+  // pause menu, so it's also where Abandon Run lives (see abandonConfirming
+  // just above). There's nothing this menu actually pauses -- nothing on
+  // the play screen runs on a clock or ticks while it's open -- it's a
+  // "step away from the table" menu in the same spirit as one, not a
+  // literal game-clock pause.
   function renderDrawer(){
     const info = actInfo(state.ante);
     return `<div class="drawer-back" id="drawer-back"><div class="drawer" role="dialog" aria-label="Production details">
@@ -6084,13 +6105,26 @@ footer.note{ display:none; }
           return `<div class="die-pick static ${on?"picked":""}" style="--tint:${k.tint||"var(--gold)"}" data-tip-pool="${d.uid}"><span class="die die-sm">${dieFaceSVG(6,k.tint)}</span><span class="die-pick-label">${k.name}${on?" · in play":""}</span></div>`; }).join("")}</div></div>
       <div><div class="sec-h">Dailies</div><div class="log">${state.log.length? state.log.map(r=>`<div class="log-row"><span class="lt">${r.t}</span><span class="ls">${r.s}</span></div>`).join("") : `<div class="log-row"><span class="lt">No rolls yet this scene.</span></div>`}</div></div>
       <div class="hint">Hold any bet, perk or die to read what it does. Eggs found: ${eggsFound()}/${EGG_TOTAL}</div>
+      <div class="sec-h" style="margin-top:2px">Pause Menu</div>
+      ${abandonConfirming ? `
+        <div class="abandon-confirm">
+          <p class="savecode-hint" style="margin:0 0 8px">Abandon this run? Bankroll, Payroll and everything built up this run are gone for good -- there's no undo.</p>
+          <div class="bet-row">
+            <button class="btn btn-ghost btn-sm" id="btn-abandon-cancel">Never Mind</button>
+            <button class="btn btn-sm" id="btn-abandon-confirm" style="background:linear-gradient(180deg,var(--marquee-red-bright),var(--marquee-red));color:var(--cream);border-color:transparent">Yes, Abandon It</button>
+          </div>
+        </div>` : `
+        <button class="btn btn-ghost btn-sm" id="btn-abandon-open" style="width:100%;color:var(--marquee-red-bright);border-color:var(--marquee-red-bright)">Abandon Run</button>`}
     </div></div>`;
   }
   function wireDrawer(){
     const open = document.getElementById("btn-drawer"); if(open) open.onclick = ()=>{ drawerOpen = true; render(); };
-    const close = document.getElementById("btn-drawer-close"); if(close) close.onclick = ()=>{ drawerOpen = false; render(); };
-    const back = document.getElementById("drawer-back"); if(back) back.addEventListener("click", e=>{ if(e.target===back){ drawerOpen=false; render(); } });
+    const close = document.getElementById("btn-drawer-close"); if(close) close.onclick = ()=>{ abandonConfirming = false; drawerOpen = false; render(); };
+    const back = document.getElementById("drawer-back"); if(back) back.addEventListener("click", e=>{ if(e.target===back){ abandonConfirming = false; drawerOpen=false; render(); } });
     root.querySelectorAll("[data-tip-pool]").forEach(el=>{ const d=state.dicePool.find(x=>x.uid===el.dataset.tipPool); if(d) wireHoldTip(el, DIE_KINDS[d.kind].name, DIE_KINDS[d.kind].desc); });
+    const abandonOpen = document.getElementById("btn-abandon-open"); if(abandonOpen) abandonOpen.onclick = ()=>{ abandonConfirming = true; render(); };
+    const abandonCancel = document.getElementById("btn-abandon-cancel"); if(abandonCancel) abandonCancel.onclick = ()=>{ abandonConfirming = false; render(); };
+    const abandonConfirm = document.getElementById("btn-abandon-confirm"); if(abandonConfirm) abandonConfirm.onclick = ()=>{ abandonConfirming = false; drawerOpen = false; gameOver("You called it -- the run's abandoned."); };
   }
 
   function renderBlindSelect(){
@@ -6228,7 +6262,7 @@ footer.note{ display:none; }
   }
 
   function render(){
-    if(state.screen!=="play") drawerOpen = false;
+    if(state.screen!=="play"){ drawerOpen = false; abandonConfirming = false; }
     applyTheme();
     if(state.dieLostPrompt){ renderDieLostPrompt(); try{ syncCrowd(); }catch(e){} return; }
     if(state.screen==="title") renderTitle();
