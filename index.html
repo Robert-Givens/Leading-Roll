@@ -1376,7 +1376,11 @@ footer.note{ display:none; }
     // change how a DIE's own multiplier gets computed, since that
     // computation happens in its own dedicated step, not through the
     // per-item onPayout loop this object would otherwise be called from.
-    { id:"cast_leading_man", type:"cast", name:"Leading Man", cost:9,
+    // requiresDieKind: this used to be able to show up in the shop before
+    // you'd ever seen a Steel Die, where it just sat there doing nothing --
+    // see drawEquipOffer, which now hides any perk carrying this field
+    // until state.dicePool actually holds a die of that kind.
+    { id:"cast_leading_man", type:"cast", name:"Leading Man", cost:9, requiresDieKind:"steel",
       desc:"Triples the bonus every Steel Die in your lineup is currently providing. Does nothing on its own -- it needs at least one Steel Die active to amplify." },
     // Pure Lucky-card energy: no bet, no hand, no pattern required -- just a
     // flat per-roll chance at a free Heat checkpoint. Routed through
@@ -1386,7 +1390,23 @@ footer.note{ display:none; }
     // together (same Cast slot).
     { id:"cast_lucky_cat", type:"cast", name:"Lucky Cat", cost:6,
       desc:"A small chance every roll to bank a free Heat checkpoint, whether you had a bet on it or not -- the cat waves from the corner of the set, and every so often it's actually good luck.",
-      onRoll:(ctx)=>{ if(Math.random()<0.12) gainHeat(1); } }
+      onRoll:(ctx)=>{ if(Math.random()<0.12) gainHeat(1); } },
+    // Grows state.dicePool itself by one, rather than boosting a payout or a
+    // roll -- one more slot to fill at the Dice Shop, and one more option
+    // every time "Cast Your Dice" comes up (still only 2 of however many
+    // you own ever get picked to actually roll -- see confirmLineup -- this
+    // just widens the pool you're picking from). No onEquip hook exists
+    // on these items, so the grant happens where every perk purchase
+    // actually lands (buyShopOffer's offer.kind==="perk" branch), gated by
+    // state.extraDieSlotGranted so buying, unequipping and re-buying this
+    // can't stack a second bonus die. Deliberately a one-time permanent
+    // grant rather than a while-equipped bonus (contrast Studio Legacy/New
+    // Talent/Scene Stealer above, which explicitly give up their stacks the
+    // moment they're swapped out) -- clawing back a physical die from an
+    // already-built lineup the moment this left your Cast slot would be a
+    // much nastier surprise than losing a multiplier.
+    { id:"cast_the_extra", type:"cast", name:"The Extra", cost:9,
+      desc:"The moment you bring this on: permanently adds one more die to your lot. One extra slot at the Dice Shop, one more option every time you pick your lineup -- for good, even if this leaves your Cast slot later." }
   );
 
   const BOSS_BLINDS = [
@@ -2188,6 +2208,11 @@ footer.note{ display:none; }
       studioLegacyStacks: 0,
       newTalentStacks: 0,
       sceneStealerStacks: 0,
+      // The Extra (Cast, see EQUIPMENT_POOL): true once its one-time +1
+      // dicePool slot has been handed out this run. Unlike the three
+      // stack counters just above, this never increments further -- it's
+      // a single flag guarding a single grant, checked in buyShopOffer.
+      extraDieSlotGranted: false,
       heat: 1,                 // 0-HEAT_MAX checkpoints banked; each cushions one crap-out. Persists across scenes, resets only on a new run. Starts at 1, not 0 -- so a brand-new run can never end on its very first crap-out, before the player's made a single shop choice.
       stuntDoubleUsed: false, // Stunt Double: only shields one crap-out per run, not per scene
       castNote: null,          // one-line callout for a Heat event -- a gain, a crap-out cushion, or a Cast item's effect
@@ -2654,23 +2679,12 @@ footer.note{ display:none; }
     const mark = (kind, label, key)=>{ if(ctx.amount!==prevAmt){ steps.push({ kind, label, key, from:prevAmt, to:ctx.amount }); prevAmt = ctx.amount; } };
     const boss = state.tierIdx===2 ? BOSS_BLINDS.find(x=>x.id===state.bossId) : null;
     if(boss && boss.onPayout){ boss.onPayout(ctx); mark("boss", boss.name, "boss"); }
-    // A character's own passive trait (see CHARACTERS), if it's payout-
-    // shaped, runs right alongside the equipped item hooks below -- it's
-    // not tied to any slot, so state.bossDisabledSlot never touches it.
-    const character = CHARACTERS[state.characterId];
-    if(character && character.onPayout){ character.onPayout(ctx); mark("lead", character.name.replace(/^The /,""), "lead"); }
-    // Director's Notes can shut down one equipped slot for this whole roll
-    // (see BOSS_BLINDS/resolveOnRoll, which picks state.bossDisabledSlot
-    // before any bet resolves) -- that slot's hooks just don't fire here.
-    EQUIP_SLOTS.forEach(slot=>{
-      const item = state.equipped[slot];
-      // ctx.triggers: how many perks/traits have already boosted this bet
-      // (read by Hype Man, see EQUIPMENT_POOL) -- boss twists don't count.
-      if(item && item.onPayout && slot!==state.bossDisabledSlot){ ctx.triggers = steps.filter(s=>s.kind!=="boss").length; item.onPayout(ctx); mark("slot", item.name, slot); }
-    });
-    // A rare die's own payout multiplier (e.g. Payday Sixes, Odd Fortune)
-    // applies whenever it's in the active lineup, stacking with whatever
-    // item/boss effects already ran above -- see DIE_KINDS' payoutMult.
+    // Scoring order from here down is deliberately dice, then perks, then
+    // character (boss twists always go first, same as every resolve
+    // function -- see resolveOnRoll's own comment on state.bossDisabledSlot
+    // for why boss can never move). A rare die's own payout multiplier
+    // (e.g. Payday Sixes, Odd Fortune) applies whenever it's in the active
+    // lineup -- see DIE_KINDS' payoutMult.
     getActiveDice().forEach(d=>{
       const kind = DIE_KINDS[d.kind];
       if(kind && kind.payoutMult){ ctx.amount *= kind.payoutMult; mark("die", kind.name, "die"); }
@@ -2691,6 +2705,22 @@ footer.note{ display:none; }
         mark("die", kind.name, "die");
       }
     });
+    // Director's Notes can shut down one equipped slot for this whole roll
+    // (see BOSS_BLINDS/resolveOnRoll, which picks state.bossDisabledSlot
+    // before any bet resolves) -- that slot's hooks just don't fire here.
+    EQUIP_SLOTS.forEach(slot=>{
+      const item = state.equipped[slot];
+      // ctx.triggers: how many perks/traits have already boosted this bet
+      // (read by Hype Man, see EQUIPMENT_POOL) -- boss twists don't count,
+      // but the dice step(s) above now do, since dice run before perks.
+      if(item && item.onPayout && slot!==state.bossDisabledSlot){ ctx.triggers = steps.filter(s=>s.kind!=="boss").length; item.onPayout(ctx); mark("slot", item.name, slot); }
+    });
+    // A character's own passive trait (see CHARACTERS), if it's payout-
+    // shaped, runs last of the three "scoring" hooks -- after dice and
+    // perks, same order as resolveOnRoll -- it's not tied to any slot, so
+    // state.bossDisabledSlot never touches it.
+    const character = CHARACTERS[state.characterId];
+    if(character && character.onPayout){ character.onPayout(ctx); mark("lead", character.name.replace(/^The /,""), "lead"); }
     // Felt Upgrade: each bet zone has its own felt piece (see FELT_ZONES) --
     // a payout only gets a boost if THIS zone has been upgraded, not the
     // whole table at once. Independent of equipment, and stacks linearly
@@ -2790,16 +2820,17 @@ footer.note{ display:none; }
     // call for this same roll, so the pick is already locked in by the time
     // any bet resolves.
     if(boss && boss.onRoll){ boss.onRoll(ctx); markB("boss", boss.name, "boss"); }
-    // A character's own onRoll (see CHARACTERS -- e.g. The Lovers stashing
-    // "was this roll a double" for their own onPayout to read back) fires
-    // here too, same as onPayout/onLoss do in resolvePayout/
-    // resolveLossAmount -- always ahead of any bet resolving this roll.
-    const character = CHARACTERS[state.characterId];
-    if(character && character.onRoll){ character.onRoll(ctx); markB("lead", character.name.replace(/^The /,""), "lead"); }
+    // Same dice-then-perks-then-character order as resolvePayout (dice
+    // already ran first, right at the top of this function, ahead of even
+    // boss -- see that block's own comment). Perks fire before the
+    // character's own onRoll (see CHARACTERS -- e.g. The Lovers stashing
+    // "was this roll a double" for their own onPayout to read back).
     EQUIP_SLOTS.forEach(slot=>{
       const item = state.equipped[slot];
       if(item && item.onRoll && slot!==state.bossDisabledSlot){ item.onRoll(ctx); markB("slot", item.name, slot); }
     });
+    const character = CHARACTERS[state.characterId];
+    if(character && character.onRoll){ character.onRoll(ctx); markB("lead", character.name.replace(/^The /,""), "lead"); }
     const amt = Math.round(ctx.bonusAmount);
     if(roll && rsteps.length) (roll.trace = roll.trace || []).push({ roll:true, win:amt>0, bet:"Every roll", base:0, steps:rsteps, final:amt });
     if(amt>0){
@@ -2897,6 +2928,26 @@ footer.note{ display:none; }
     beginRunAs(state.characterId, state.difficulty);
   }
 
+  // Restores every sidelined die's real kind (see maybeLoseDie -- it swaps a
+  // die to a Standard stand-in for the rest of the scene it rolled off the
+  // table in) and clears the sideline list. Safe to call more than once --
+  // an empty (or already-restored) list is a no-op -- so both settleRound
+  // (right before the shop offers get rolled -- see its own call below) and
+  // beginScreening (the original, only call site) can each call it without
+  // stepping on the other. Pulling this in at settleRound matters because
+  // the Dice Shop's own "write off which die?" picker (renderShop) reads
+  // straight off state.dicePool[*].kind -- without this, a die lost last
+  // scene still shows there as a plain Standard Die (looking gone for good)
+  // for the whole shop visit, since beginScreening's own restore doesn't
+  // run until the NEXT scene actually starts, well after the shop closes.
+  function restoreSidelinedDice(){
+    (state.sidelinedDice||[]).forEach(s=>{
+      const d = state.dicePool.find(x=>x.uid===s.uid);
+      if(d) d.kind = s.kind;
+    });
+    state.sidelinedDice = [];
+  }
+
   function beginScreening(){
     try{ onSceneStartEgg(); }catch(e){}
     // retakesLeft is deliberately NOT reset here any more -- it's a bought
@@ -2931,14 +2982,12 @@ footer.note{ display:none; }
     state.lastFieldNote = null;
     state.lastDieLostMsg = null;
     state.pendingSelect = [];
-    // Restore every sidelined die's real kind before wiping the list -- it
-    // was swapped to a Standard Die stand-in for the rest of last scene only
-    // (see maybeLoseDie); the original kind comes back unchanged now.
-    (state.sidelinedDice||[]).forEach(s=>{
-      const d = state.dicePool.find(x=>x.uid===s.uid);
-      if(d) d.kind = s.kind;
-    });
-    state.sidelinedDice = [];
+    // Restore every sidelined die's real kind before wiping the list -- see
+    // restoreSidelinedDice(). Usually already a no-op by the time this runs
+    // now: settleRound calls it first, right when the shop opens, so this
+    // is just the defensive second call for any path into a new scene that
+    // doesn't go through the shop.
+    restoreSidelinedDice();
     state.dieLostPrompt = null;
     state.dieLostReturnPhase = null;
     // Scene Stipend does double duty here -- see sceneStipendFor. It's the
@@ -4308,6 +4357,15 @@ footer.note{ display:none; }
       render(); saveState();
       return;
     }
+    // Put back any die that rolled off the table this scene BEFORE the shop
+    // offers get rolled -- see restoreSidelinedDice(). Both this call and
+    // rollShopOffers() (right below) need state.dicePool holding everyone's
+    // real kind, not last scene's Standard stand-in: this one so the shop's
+    // die picker shows your dice as themselves, rollShopOffers so a
+    // die-tied perk's ownership check (dieOwnedFor, called from
+    // drawEquipOffer) isn't fooled into thinking you don't own a die you
+    // actually do, just because it had a rough night last scene.
+    restoreSidelinedDice();
     state.shopOffers = rollShopOffers();
     state.shopRerollCost = rerollBaseCostFor();
     state.retakeBuyCost = RETAKE_SHOP_BASE_COST;
@@ -4467,24 +4525,51 @@ footer.note{ display:none; }
     render(); saveState();
   }
 
+  // A perk carrying requiresDieKind (e.g. Leading Man -- see its own
+  // comment in EQUIPMENT_POOL) does nothing at all until you own a die of
+  // that kind, so it has no business showing up in the shop before then --
+  // it would just be a dead slot. True the instant a real die of that kind
+  // sits anywhere in state.dicePool, sidelined-this-scene ones included
+  // (settleRound restores those before the shop even rolls -- see
+  // restoreSidelinedDice -- so this never sees the temporary Standard
+  // stand-in maybeLoseDie leaves behind mid-scene).
+  function dieOwnedFor(item){
+    return !item.requiresDieKind || state.dicePool.some(d=>d.kind===item.requiresDieKind);
+  }
   // Draws one item id for `slot` from its shuffled bag, refilling and
   // reshuffling from the full pool for that type whenever the bag runs dry.
   // Skips the currently-equipped item when another option is available in
   // the bag, so the shop doesn't immediately re-offer what you're already
-  // wearing; that equipped item stays in the bag for a future draw once
-  // everything else in its type has been offered.
+  // wearing -- a soft preference, not a hard rule, so the equipped item can
+  // still come back up once nothing else in the bag is eligible. A
+  // die-locked perk you don't own (dieOwnedFor) is a hard rule instead: it
+  // never gets drawn, full stop, even as a last resort. It stays in the bag
+  // rather than getting discarded, so buying that die later puts it right
+  // back in the running on some future draw. Tries the current bag first,
+  // then one fresh full reshuffle if that pass found nothing eligible at
+  // all (every remaining entry either equipped or an unowned die-lock) --
+  // one retry is enough given how small a slice of any pool is ever
+  // die-locked. If even a fresh reshuffle comes up empty (every item in the
+  // whole pool for this slot is a die-locked perk for a die nobody owns),
+  // this slot simply offers no perk this visit rather than break the rule
+  // -- rollShopOffers/buyShopOffer already treat a null item as "sold".
   function drawEquipOffer(slot, excludeId){
     if(!state.equipOfferBags) state.equipOfferBags = { film:[], script:[], lens:[], cast:[] };
-    let bag = state.equipOfferBags[slot];
-    if(!bag || !bag.length){
-      bag = EQUIPMENT_POOL.filter(i=>i.type===slot).map(i=>i.id);
-      for(let i=bag.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [bag[i],bag[j]]=[bag[j],bag[i]]; }
-      state.equipOfferBags[slot] = bag;
+    const idOf = id => EQUIPMENT_POOL.find(i=>i.id===id);
+    const freshBag = ()=>{
+      const b = EQUIPMENT_POOL.filter(i=>i.type===slot).map(i=>i.id);
+      for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; }
+      return b;
+    };
+    if(!state.equipOfferBags[slot] || !state.equipOfferBags[slot].length) state.equipOfferBags[slot] = freshBag();
+    for(let pass=0; pass<2; pass++){
+      const bag = state.equipOfferBags[slot];
+      let idx = bag.findIndex(id=>id!==excludeId && dieOwnedFor(idOf(id)));
+      if(idx<0) idx = bag.findIndex(id=>dieOwnedFor(idOf(id))); // equipped item OK as a last resort; an unowned die-lock never is
+      if(idx>=0){ const id = bag.splice(idx,1)[0]; return idOf(id) || null; }
+      state.equipOfferBags[slot] = freshBag();
     }
-    let idx = bag.findIndex(id=>id!==excludeId);
-    if(idx<0) idx = 0;
-    const id = bag.splice(idx,1)[0];
-    return EQUIPMENT_POOL.find(i=>i.id===id) || null;
+    return null;
   }
 
   // The unified shop roll: exactly 3 slots, each independently landing on a
@@ -4542,6 +4627,16 @@ footer.note{ display:none; }
       if(state.payroll < item.cost) return;
       state.payroll -= item.cost;
       state.equipped[offer.slot] = {...item};
+      // The Extra's one-time dicePool grant -- see its own comment in
+      // EQUIPMENT_POOL for why this is a permanent push here rather than a
+      // while-equipped hook. extraDieSlotGranted keeps a second purchase
+      // (after swapping it back out and it coming up again) from stacking
+      // a second bonus die.
+      if(item.id==="cast_the_extra" && !state.extraDieSlotGranted){
+        state.dicePool.push({ uid:"die"+state.nextDieUid, kind:"standard" });
+        state.nextDieUid += 1;
+        state.extraDieSlotGranted = true;
+      }
       state.shopOffers[idx] = null;
       render(); saveState();
     }
