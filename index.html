@@ -1,4 +1,9 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Leading Roll</title><title>Leading Roll</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Leading Roll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@500;600;700;800&family=Libre+Franklin:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=IM+Fell+English+SC&family=Limelight&family=Special+Elite&family=Yellowtail&family=Righteous&family=Shrikhand&family=Audiowide&family=Bungee&family=Archivo:wdth,wght@62..125,400;62..125,800&family=Press+Start+2P&display=swap">
 <!-- Installable as a home-screen app (see the user's "leave the app and come
@@ -1012,14 +1017,6 @@ footer.note{ display:none; }
 @keyframes perkFire{ 0%{ transform:scale(1) } 40%{ transform:scale(1.16) rotate(-3deg) } 100%{ transform:none } }
 .perk[data-badge]::after{ content:attr(data-badge); position:absolute; top:-10px; right:-3px; background:var(--t,var(--gold-bright)); color:#111; font:700 9.5px 'JetBrains Mono',monospace; border-radius:99px; padding:1px 5px; border:1px solid rgba(0,0,0,.6); white-space:nowrap; animation:badgeUp .9s ease-out forwards; z-index:3; }
 @keyframes badgeUp{ 0%{ opacity:0; transform:translateY(6px) scale(.6) } 20%{ opacity:1; transform:translateY(0) scale(1.1) } 80%{ opacity:1 } 100%{ opacity:0; transform:translateY(-8px) } }
-/* Drag-to-reorder (see wirePerkDrag) -- touch-action:none so a touch-drag
-   moves the tile instead of scrolling the page underneath it; cursor:grab
-   is the only static hint that these 4 (unlike Lead) can be picked up and
-   reordered, since there's no room in a 31px-tall tile for a drag-handle
-   icon on top of the tag/name it already carries. */
-.perk[data-perk-slot]{ cursor:grab; touch-action:none; transition:box-shadow .12s ease; }
-.perk.dragging{ cursor:grabbing; opacity:.9; box-shadow:0 10px 20px -8px var(--shadow), 0 0 0 1px var(--t,var(--gold-bright)) inset; transition:none; }
-.perk.drag-over{ box-shadow:0 0 0 2px var(--t,var(--gold-bright)) inset; }
 .hud-row1{ min-height:28px; }
 
 .roll-line{ display:flex; align-items:center; gap:10px; }
@@ -1097,7 +1094,10 @@ footer.note{ display:none; }
 .point-box .puck{ top:1px; right:1px; font-size:7px; padding:0 4px; }
 
 .icon-btn:not(.on){opacity:.6}
-</style></head><body>
+</style>
+</head>
+<body>
+
 
 <div class="wrap" id="app"></div>
 <!-- Lives outside #app on purpose: render() replaces #app's whole innerHTML
@@ -1144,19 +1144,6 @@ footer.note{ display:none; }
     cast:   { name:"Supporting Cast", tint:"var(--emerald-bright)", tagline:"Twists on how Heat builds, what it's worth banked, and what it pays out spent." },
   };
   const EQUIP_SLOTS = ["film","script","lens","cast"];
-  // Player-set order the 4 Production Kit slots resolve AND display in --
-  // see state.perkOrder (freshState/migrateLoadedState) and wirePerkDrag
-  // (perkBar's actual drag-to-reorder). Every scoring hook loop
-  // (resolvePayout/resolveLossAmount/resolveOnRoll/resolveRetriggers) and
-  // both perkBar()/kitStrip() call this instead of walking EQUIP_SLOTS
-  // directly, so a missing/corrupt state.perkOrder (an old save, a hand-
-  // edited Save Code) always falls back to the original fixed order rather
-  // than throwing or silently dropping a slot.
-  function perkOrderSafe(){
-    const po = state.perkOrder;
-    if(Array.isArray(po) && po.length===EQUIP_SLOTS.length && EQUIP_SLOTS.every(s=>po.includes(s))) return po;
-    return EQUIP_SLOTS;
-  }
 
   // All 36 two-die outcomes resolve to exactly one of these, in priority order.
   // "Bit Part" (not "Supporting Role") so it doesn't collide with the
@@ -1883,17 +1870,12 @@ footer.note{ display:none; }
       onPayout:(ctx)=>{ if(ctx.state.rollNumber>0 && ctx.state.rollNumber%3===0) ctx.amount *= 1.5; } },
   };
   // Order here IS the unlock gauntlet order (see maybeUnlockNextCharacter) --
-  // ranked by the QA chat's per-character win-rate matrix (Era 1, each
-  // character's own tuned strategy, N=10,000 games/character -- see
-  // balance-notes.md's "8-character QA pass" and the later Era 1 vs. Era 9
-  // table, which reconfirmed the same ranking): Gunslinger 84.87% >
-  // Survivor 76.62% > Prankster 74.83% > Lovers 64.12% > General 64.11% >
-  // Conductor 63.59% > Time Traveler 55.11% > Hustler 54.35%. Easiest
-  // (highest win rate) leads off needing no unlock at all; the hardest
-  // (lowest win rate) is the last lead cast, same "prove it on the one
-  // before you unlock the next" gauntlet as before -- only the ranking
-  // basis changed, from guessed trait complexity to measured win rate.
-  const CHARACTER_ORDER = ["gunslinger","survivor","prankster","lovers","general","conductor","time_traveler","hustler"];
+  // Gunslinger needs no unlock and leads it off; everyone after is ranked
+  // roughly simplest/lowest-impact trait to most complex/build-defining one,
+  // so newer players meet an easy economy tweak or a flat probability
+  // safety net long before they're handed something that bends the rules
+  // outright (Time Traveler's free Retake, last in line).
+  const CHARACTER_ORDER = ["gunslinger","hustler","prankster","general","survivor","conductor","lovers","time_traveler"];
 
   // A die kind is built from independent pieces, mixed and matched:
   //  - `faces` narrows what it can roll at all (missing = a plain uniform
@@ -2207,13 +2189,6 @@ footer.note{ display:none; }
       score:0,
       payroll:0,
       equipped:{ film:null, script:null, lens:null, cast:null },   // one item per type, never more
-      // Player-set resolution/display order for the 4 Production Kit slots
-      // above -- see perkOrderSafe(), which every scoring hook and both
-      // perkBar()/kitStrip() read instead of the fixed EQUIP_SLOTS array
-      // directly, and wirePerkDrag() (perkBar's drag-to-reorder). Always a
-      // permutation of all 4 slot ids, filled or not -- reordering just
-      // changes WHERE an empty slot's turn comes up, not whether it fires.
-      perkOrder: [...EQUIP_SLOTS],
       // Unified shop, one shared roll: 3 slots, each independently a Felt,
       // Dice or Perk (Production Kit) offer -- see rollShopOffers. Replaces
       // the old equipOffers/feltOffers/diceShopOffers three-separate-
@@ -2527,16 +2502,6 @@ footer.note{ display:none; }
             s.equipped[slot] = null;
           }
         });
-        // A save from before drag-to-reorder existed (or one with a
-        // corrupted array) has no perkOrder at all -- back it onto the
-        // original fixed film/script/lens/cast order, same order every run
-        // used to resolve/display in before this feature. perkOrderSafe()
-        // (see there) would catch this at read time regardless, but writing
-        // a real value back here keeps state.perkOrder itself always valid
-        // rather than leaning on the fallback forever.
-        if(!(Array.isArray(s.perkOrder) && s.perkOrder.length===EQUIP_SLOTS.length && EQUIP_SLOTS.every(sl=>s.perkOrder.includes(sl)))){
-          s.perkOrder = [...EQUIP_SLOTS];
-        }
         // Same dropped-functions problem applies to a "perk" shop offer's
         // item -- re-merge it against a fresh EQUIPMENT_POOL lookup too. A
         // save from before the unified 3-slot shop existed (still on the
@@ -2883,13 +2848,12 @@ footer.note{ display:none; }
     const mark = (kind, label, key)=>{ if(ctx.amount!==prevAmt){ steps.push({ kind, label, key, from:prevAmt, to:ctx.amount }); prevAmt = ctx.amount; } };
     const boss = state.tierIdx===2 ? BOSS_BLINDS.find(x=>x.id===state.bossId) : null;
     if(boss && boss.onPayout){ boss.onPayout(ctx); mark("boss", boss.name, "boss"); }
-    // Scoring order from here down is deliberately dice, then felt, then
-    // perks (in whatever order the player's dragged them to, see
-    // perkOrderSafe), then character (boss twists always go first, same as
-    // every resolve function -- see resolveOnRoll's own comment on
-    // state.bossDisabledSlot for why boss can never move). A rare die's own
-    // payout multiplier (e.g. Payday Sixes, Odd Fortune) applies whenever
-    // it's in the active lineup -- see DIE_KINDS' payoutMult.
+    // Scoring order from here down is deliberately dice, then perks, then
+    // character (boss twists always go first, same as every resolve
+    // function -- see resolveOnRoll's own comment on state.bossDisabledSlot
+    // for why boss can never move). A rare die's own payout multiplier
+    // (e.g. Payday Sixes, Odd Fortune) applies whenever it's in the active
+    // lineup -- see DIE_KINDS' payoutMult.
     getActiveDice().forEach(d=>{
       const kind = DIE_KINDS[d.kind];
       if(kind && kind.payoutMult){ ctx.amount *= kind.payoutMult; mark("die", kind.name, "die"); }
@@ -2910,33 +2874,28 @@ footer.note{ display:none; }
         mark("die", kind.name, "die");
       }
     });
-    // Felt Upgrade: each bet zone has its own felt piece (see FELT_ZONES) --
-    // a payout only gets a boost if THIS zone has been upgraded, not the
-    // whole table at once. Independent of equipment, and stacks linearly
-    // with every purchase of that zone (see feltCost/buyFeltZone). Runs
-    // right after dice now -- it used to be the very last hook, after
-    // perks and the character trait, moved up here so the table itself
-    // (dice, then felt) always finishes shaping a payout before any
-    // equipped perk or the character's own trait gets a turn.
-    ctx.amount += feltBonusFor(ctx.betType, ctx.number);
-    mark("felt", "Felt", "felt");
     // Director's Notes can shut down one equipped slot for this whole roll
     // (see BOSS_BLINDS/resolveOnRoll, which picks state.bossDisabledSlot
     // before any bet resolves) -- that slot's hooks just don't fire here.
-    perkOrderSafe().forEach(slot=>{
+    EQUIP_SLOTS.forEach(slot=>{
       const item = state.equipped[slot];
       // ctx.triggers: how many perks/traits have already boosted this bet
       // (read by Hype Man, see EQUIPMENT_POOL) -- boss twists don't count,
-      // but the dice and felt steps above now do, since both run before
-      // perks.
+      // but the dice step(s) above now do, since dice run before perks.
       if(item && item.onPayout && slot!==state.bossDisabledSlot){ ctx.triggers = steps.filter(s=>s.kind!=="boss").length; item.onPayout(ctx); mark("slot", item.name, slot); }
     });
     // A character's own passive trait (see CHARACTERS), if it's payout-
-    // shaped, runs last of all -- after dice, felt and every perk, same
-    // order as resolveOnRoll -- it's not tied to any slot, so
+    // shaped, runs last of the three "scoring" hooks -- after dice and
+    // perks, same order as resolveOnRoll -- it's not tied to any slot, so
     // state.bossDisabledSlot never touches it.
     const character = CHARACTERS[state.characterId];
     if(character && character.onPayout){ character.onPayout(ctx); mark("lead", character.name.replace(/^The /,""), "lead"); }
+    // Felt Upgrade: each bet zone has its own felt piece (see FELT_ZONES) --
+    // a payout only gets a boost if THIS zone has been upgraded, not the
+    // whole table at once. Independent of equipment, and stacks linearly
+    // with every purchase of that zone (see feltCost/buyFeltZone).
+    ctx.amount += feltBonusFor(ctx.betType, ctx.number);
+    mark("felt", "Felt", "felt");
     const amount = Math.max(0, Math.round(Math.min(ctx.amount, ctx.payoutCap)));
     if(ctx.payoutCap < ctx.amount) steps.push({ kind:"cap", label:"Cap", key:"boss", from:ctx.amount, to:amount });
     state.score += amount;
@@ -2970,16 +2929,12 @@ footer.note{ display:none; }
     let pushSrc = null;
     const boss = state.tierIdx===2 ? BOSS_BLINDS.find(x=>x.id===state.bossId) : null;
     if(boss && boss.onLoss){ boss.onLoss(ctx); if(ctx.push && !pushSrc) pushSrc = { label:boss.name, key:"boss" }; }
-    // Perks (in the player's own drag order, see perkOrderSafe) before the
-    // character's own trait, same as resolvePayout/resolveOnRoll -- this
-    // used to run character-before-perks, the one resolve function out of
-    // step with the other two, fixed here to match.
-    perkOrderSafe().forEach(slot=>{
+    const character = CHARACTERS[state.characterId];
+    if(character && character.onLoss){ character.onLoss(ctx); if(ctx.push && !pushSrc) pushSrc = { label:character.name.replace(/^The /,""), key:"lead" }; }
+    EQUIP_SLOTS.forEach(slot=>{
       const item = state.equipped[slot];
       if(item && item.onLoss && slot!==state.bossDisabledSlot){ item.onLoss(ctx); if(ctx.push && !pushSrc) pushSrc = { label:item.name, key:slot }; }
     });
-    const character = CHARACTERS[state.characterId];
-    if(character && character.onLoss){ character.onLoss(ctx); if(ctx.push && !pushSrc) pushSrc = { label:character.name.replace(/^The /,""), key:"lead" }; }
     if(ctx.push){
       if(opts.roll) (opts.roll.trace = opts.roll.trace || []).push({ push:true, bet:betLabelFor(opts.betType, opts.number), base:baseAmount, src:pushSrc });
       return { amount:0, pushed:true };
@@ -3036,13 +2991,10 @@ footer.note{ display:none; }
     if(boss && boss.onRoll){ boss.onRoll(ctx); markB("boss", boss.name, "boss"); }
     // Same dice-then-perks-then-character order as resolvePayout (dice
     // already ran first, right at the top of this function, ahead of even
-    // boss -- see that block's own comment; there's no felt step here since
-    // Econ felt zones pay Payroll directly, above, rather than feeding
-    // ctx.bonusAmount). Perks fire in the player's own drag order (see
-    // perkOrderSafe) before the character's own onRoll (see CHARACTERS --
-    // e.g. The Lovers stashing "was this roll a double" for their own
-    // onPayout to read back).
-    perkOrderSafe().forEach(slot=>{
+    // boss -- see that block's own comment). Perks fire before the
+    // character's own onRoll (see CHARACTERS -- e.g. The Lovers stashing
+    // "was this roll a double" for their own onPayout to read back).
+    EQUIP_SLOTS.forEach(slot=>{
       const item = state.equipped[slot];
       if(item && item.onRoll && slot!==state.bossDisabledSlot){ item.onRoll(ctx); markB("slot", item.name, slot); }
     });
@@ -4267,10 +4219,7 @@ footer.note{ display:none; }
   function resolveRetriggers(roll){
     const wins = (roll.trace||[]).filter(t=>t.win && !t.roll && !t.retrigger && t.final>0);
     if(!wins.length) return;
-    // Player's own drag order (see perkOrderSafe) -- only ever perks have a
-    // retrigger(), so this is the one resolve step where that order is ALL
-    // that decides which equipped item's extra pay lands first in the log.
-    perkOrderSafe().forEach(slot=>{
+    EQUIP_SLOTS.forEach(slot=>{
       const item = state.equipped[slot];
       if(!item || !item.retrigger || slot===state.bossDisabledSlot) return;
       const picks = item.retrigger(wins, { state, pointMade: !!roll.pointMade, sum: roll.sum, comeout: roll.comeout }) || [];
@@ -4338,14 +4287,6 @@ footer.note{ display:none; }
     render();
     const dieAEl = document.getElementById('die-a');
     const dieBEl = document.getElementById('die-b');
-    // Captured once, up front, rather than after the tumble -- the tint
-    // used for the tumbling faces below (and stamped onto lastRoll once it
-    // settles, see kindA/kindB) has to be THIS roll's active lineup, and it
-    // can't change mid-animation regardless (selectedDiceIds is locked once
-    // state.rolling is true, see wireCommon's roll button).
-    const active = getActiveDice();
-    const tintA = active[0] && DIE_KINDS[active[0].kind] ? DIE_KINDS[active[0].kind].tint : null;
-    const tintB = active[1] && DIE_KINDS[active[1].kind] ? DIE_KINDS[active[1].kind].tint : null;
     let ticks = 0;
     const totalTicks = 7;
     // Options' Game Speed (see speedMult) shortens the tumble itself rather
@@ -4354,15 +4295,11 @@ footer.note{ display:none; }
     const tickMs = Math.max(18, Math.round(75*speedMult()));
     const iv = setInterval(()=>{
       ticks += 1;
-      // Tumbling faces are tinted to whichever die is actually in that
-      // slot (same color the Dice Select screen showed it in) -- so even
-      // mid-tumble, before the roll settles, it's already clear which
-      // physical die (special ability and all) is about to land which
-      // value once the two faces stop matching by pure chance.
-      if(dieAEl) dieAEl.innerHTML = dieFaceSVG(1+Math.floor(Math.random()*6), tintA);
-      if(dieBEl) dieBEl.innerHTML = dieFaceSVG(1+Math.floor(Math.random()*6), tintB);
+      if(dieAEl) dieAEl.innerHTML = dieFaceSVG(1+Math.floor(Math.random()*6));
+      if(dieBEl) dieBEl.innerHTML = dieFaceSVG(1+Math.floor(Math.random()*6));
       if(ticks>=totalTicks){
         clearInterval(iv);
+        const active = getActiveDice();
         let a = rollOneDie(active[0], 'a');
         let b = rollOneDie(active[1], 'b');
         const script = state.equipped.script;
@@ -4421,7 +4358,7 @@ footer.note{ display:none; }
         // Gun stay lined up on the next REAL roll.
         const lostDie = maybeLoseDie(sum);
         if(lostDie){
-          state.lastRoll = { a, b, hand, noRoll:true, kindA: active[0] && active[0].kind, kindB: active[1] && active[1].kind };
+          state.lastRoll = { a, b, hand, noRoll:true };
           state.lastBetNote = null;
           state.lastFieldNote = null;
           state.scriptNote = null;
@@ -4440,13 +4377,7 @@ footer.note{ display:none; }
         // resolve* call site individually.
         const roll = { grossWin:0, grossLoss:0, isDouble: a===b };
         state.rollNumber += 1;
-        // kindA/kindB: which actual die (by kind, not just position) landed
-        // each face -- read() by renderPlay's dice-tray/dice-well so a
-        // settled roll (and a re-render well after this tick loop's own
-        // tintA/tintB have gone out of scope) still colors each die to
-        // match Dice Select instead of falling back to the era's plain
-        // theme color once it's not actively tumbling any more.
-        state.lastRoll = { a, b, hand, kindA: active[0] && active[0].kind, kindB: active[1] && active[1].kind };
+        state.lastRoll = { a, b, hand };
         state.lastRollWasSeven = sum===7; // Franchise Fatigue's own lookback -- see its comment in freshState
 
         state.lastBetNote = null;
@@ -6016,13 +5947,9 @@ footer.note{ display:none; }
   }
 
   // Compact Production Kit strip -- one small tile per slot; hold a filled
-  // one to read what it does (see wireOwnedTips). Display-only (unlike
-  // perkBar's own copy of this row on the play screen) -- always reads
-  // perkOrderSafe() so it matches perkBar's order, but isn't itself
-  // draggable; the Next Up and Shop screens that use this are the wrong
-  // place to be mid-drag between bets.
+  // one to read what it does (see wireOwnedTips).
   function kitStrip(){
-    return `<div class="kit-strip">${perkOrderSafe().map(slot=>{
+    return `<div class="kit-strip">${EQUIP_SLOTS.map(slot=>{
       const item = state.equipped[slot], meta = ITEM_TYPES[slot];
       return item
         ? `<div class="kit-slot" style="--t:${meta.tint}" data-tip-owned="${slot}"><span class="g-tag">${meta.name==="Supporting Cast"?"Cast":meta.name}</span><span class="kn">${item.name}</span></div>`
@@ -6145,122 +6072,18 @@ footer.note{ display:none; }
     </div>`;
   }
   // Lead + the four Production Kit slots, pinned at the top of the play
-  // screen so the score chain (playChain) can light up whichever one fired
-  // -- in perkOrderSafe's own order, drag-to-reorder among themselves via
-  // wirePerkDrag (Lead never moves -- the character's trait always resolves
-  // last, see resolvePayout/resolveLossAmount/resolveOnRoll). Each slot
-  // tile deliberately has NO data-tip-owned here (unlike kitStrip's copy of
-  // this same row elsewhere) -- wireOwnedTips' generic wireHoldTip would
-  // fight wirePerkDrag's own hold-vs-drag disambiguation over the same
-  // pointerdown, so wirePerkDrag shows the hold-tip itself instead.
+  // screen so the score chain (playChain) can light up whichever one fired.
   function perkBar(){
     const ch = CHARACTERS[state.characterId];
     return `<div class="perkbar">
       <div class="perk lead" data-perk="lead" style="--t:var(--gold-bright)"><span class="g-tag">Lead</span><span class="kn">${ch?ch.name.replace(/^The /,""):"—"}</span></div>
-      ${perkOrderSafe().map(slot=>{ const item = state.equipped[slot], meta = ITEM_TYPES[slot];
-        return `<div class="perk ${item?"":"empty"}" data-perk="${slot}" data-perk-slot="${slot}" style="--t:${meta.tint}"><span class="g-tag">${meta.name==="Supporting Cast"?"Cast":meta.name}</span><span class="kn">${item?item.name:"—"}</span></div>`; }).join("")}
+      ${EQUIP_SLOTS.map(slot=>{ const item = state.equipped[slot], meta = ITEM_TYPES[slot];
+        return `<div class="perk ${item?"":"empty"}" data-perk="${slot}" ${item?`data-tip-owned="${slot}"`:""} style="--t:${meta.tint}"><span class="g-tag">${meta.name==="Supporting Cast"?"Cast":meta.name}</span><span class="kn">${item?item.name:"—"}</span></div>`; }).join("")}
     </div>`;
   }
   function wireLeadTip(){
     const el = document.querySelector('[data-perk="lead"]'); const ch = CHARACTERS[state.characterId];
     if(el && ch) wireHoldTip(el, ch.name, ch.trait);
-  }
-  // Drag-to-reorder for perkBar's 4 Production Kit tiles (Lead is excluded
-  // by markup -- it has no data-perk-slot). A plain hold still shows the
-  // same tooltip wireHoldTip would (reusing showHoldTip/hideHoldTip
-  // directly) -- the two gestures share one pointerdown, disambiguated by
-  // movement: past DRAG_PX before HOLD_MS elapses, it's a drag and the
-  // tooltip timer never fires; still within DRAG_PX when HOLD_MS elapses,
-  // it's a hold and the tooltip shows, same feel as everywhere else this
-  // gesture is used. Reordering itself is index-swap-on-drop, not a live
-  // shuffle while dragging -- simpler to get right with exactly 4 tiles,
-  // and `drag-over` still tells you where you're about to drop.
-  const DRAG_PX = 10;
-  // pointermove/pointerup/pointercancel are wired on `document`, not on the
-  // tile that got the pointerdown -- setPointerCapture alone turned out NOT
-  // to reliably keep a drag scoped to one tile (verified with a Playwright
-  // pointer-drag test: without this, every tile the cursor physically
-  // passes over fires its OWN pointermove listener too, each computing its
-  // own bogus delta off a downX/downY it never actually recorded, and
-  // multiple tiles end up "dragging" at once). One shared listener pair,
-  // torn down on drop, avoids depending on capture semantics at all.
-  function wirePerkDrag(){
-    const tiles = Array.from(root.querySelectorAll('.perk[data-perk-slot]'));
-    let activeTile=null, activeSlot=null, downX=0, downY=0, dragging=false, holdTimer=null;
-    const cancelHold = ()=>{ if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } };
-    const clearVisuals = ()=>{ tiles.forEach(t=>{ t.style.transform=""; t.style.zIndex=""; t.classList.remove("dragging","drag-over"); }); };
-    // The dragged tile itself sits visually on top of whatever it's hovering
-    // (it's the one being translated) -- document.elementFromPoint would
-    // otherwise just find the dragged tile again at its own cursor position,
-    // never the tile underneath. Hiding it from hit-testing for the single
-    // elementFromPoint call is the standard workaround.
-    const tileUnderPointer = (x,y)=>{
-      if(!activeTile) return null;
-      const prevPE = activeTile.style.pointerEvents;
-      activeTile.style.pointerEvents = "none";
-      const el = document.elementFromPoint(x,y);
-      activeTile.style.pointerEvents = prevPE;
-      return el && el.closest('.perk[data-perk-slot]');
-    };
-    const stopTracking = ()=>{
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
-      document.removeEventListener("pointercancel", onCancel);
-      activeTile=null; activeSlot=null; dragging=false;
-    };
-    const onMove = e=>{
-      if(!activeTile) return;
-      const dx = e.clientX-downX, dy = e.clientY-downY;
-      if(!dragging && Math.hypot(dx,dy)>DRAG_PX){
-        dragging = true; cancelHold(); hideHoldTip(); activeTile.classList.add("dragging");
-      }
-      if(!dragging) return;
-      e.preventDefault();
-      activeTile.style.transform = `translate(${dx}px, ${dy}px)`;
-      activeTile.style.zIndex = 5;
-      const overTile = tileUnderPointer(e.clientX, e.clientY);
-      tiles.forEach(t=>t.classList.remove("drag-over"));
-      if(overTile && overTile!==activeTile) overTile.classList.add("drag-over");
-    };
-    const onUp = e=>{
-      if(!activeTile) return;
-      cancelHold();
-      const tile = activeTile, slot = activeSlot, wasDragging = dragging;
-      if(wasDragging){
-        const overTile = tileUnderPointer(e.clientX, e.clientY);
-        if(overTile && overTile!==tile){
-          const order = perkOrderSafe().slice();
-          const fromIdx = order.indexOf(slot), toIdx = order.indexOf(overTile.dataset.perkSlot);
-          if(fromIdx>-1 && toIdx>-1 && fromIdx!==toIdx){
-            order.splice(fromIdx,1);
-            order.splice(toIdx,0,slot);
-            state.perkOrder = order;
-            saveState();
-            clearVisuals();
-            stopTracking();
-            render();
-            return;
-          }
-        }
-      }
-      clearVisuals();
-      stopTracking();
-    };
-    const onCancel = ()=>{ cancelHold(); hideHoldTip(); clearVisuals(); stopTracking(); };
-    tiles.forEach(tile=>{
-      const slot = tile.dataset.perkSlot;
-      tile.addEventListener("pointerdown", e=>{
-        if(e.button!=null && e.button!==0) return; // left click / primary touch only
-        activeTile = tile; activeSlot = slot;
-        downX = e.clientX; downY = e.clientY; dragging = false;
-        cancelHold();
-        const item = state.equipped[slot];
-        if(item) holdTimer = setTimeout(()=>{ showHoldTip(item.name, item.desc); }, HOLD_MS);
-        document.addEventListener("pointermove", onMove);
-        document.addEventListener("pointerup", onUp);
-        document.addEventListener("pointercancel", onCancel);
-      });
-    });
   }
   function wireBossTip(){
     const el = document.getElementById("boss-strip");
@@ -6593,14 +6416,6 @@ footer.note{ display:none; }
     if(state.rolling) chainGen++; // a new roll cancels any score chain still playing
     const boss = state.tierIdx===2 ? BOSS_BLINDS.find(x=>x.id===state.bossId) : null;
     const lr = state.lastRoll;
-    // Color each settled die in the tray to whatever kind actually rolled
-    // it (lr.kindA/kindB, stamped by doRoll) -- same tint Dice Select shows
-    // that die in, so a Loaded Die's gold or a Tri Die's red is still
-    // readable after the roll, not just during doRoll's own tumble. No
-    // lastRoll yet (a fresh scene, before the first roll) falls back to
-    // dieFaceSVG's own era-themed default, same as before this feature.
-    const lrTintA = lr && lr.kindA && DIE_KINDS[lr.kindA] ? DIE_KINDS[lr.kindA].tint : null;
-    const lrTintB = lr && lr.kindB && DIE_KINDS[lr.kindB] ? DIE_KINDS[lr.kindB].tint : null;
     const info = actInfo(state.ante);
     const rollDisabled = state.rolling || state.phase==="select" || state.roundComplete;
     const bettingOpen = state.phase!=="select" && !state.rolling && !state.roundComplete;
@@ -6644,10 +6459,10 @@ footer.note{ display:none; }
           <div class="felt${state.removeMode?" felt-removing":""}">
             <div class="felt-top">
               ${state.roundComplete ? `
-                <div class="dice-well"><div class="dice-tray"><div class="die">${dieFaceSVG(lr?lr.a:1, lrTintA)}</div><div class="die">${dieFaceSVG(lr?lr.b:1, lrTintB)}</div></div></div>
+                <div class="dice-well"><div class="dice-tray"><div class="die">${dieFaceSVG(lr?lr.a:1)}</div><div class="die">${dieFaceSVG(lr?lr.b:1)}</div></div></div>
               ` : `
                 <button class="dice-well ${state.rolling?"":"selectable"}" data-action="roll" ${state.rolling?"disabled":""} aria-label="Roll the dice">
-                  <div class="dice-tray"><div id="die-a" class="die ${state.rolling?"rolling":""}">${dieFaceSVG(lr?lr.a:1, lrTintA)}</div><div id="die-b" class="die ${state.rolling?"rolling":""}">${dieFaceSVG(lr?lr.b:1, lrTintB)}</div></div>
+                  <div class="dice-tray"><div id="die-a" class="die ${state.rolling?"rolling":""}">${dieFaceSVG(lr?lr.a:1)}</div><div id="die-b" class="die ${state.rolling?"rolling":""}">${dieFaceSVG(lr?lr.b:1)}</div></div>
                 </button>`}
               <div class="callout">
                 ${state.roundComplete
@@ -6754,7 +6569,7 @@ footer.note{ display:none; }
       </div>
       ${drawerOpen ? renderDrawer() : ""}`;
 
-    wireOwnedTips(); wireCommon(); wireBossTip(); wireDrawer(); wireLeadTip(); wirePerkDrag();
+    wireOwnedTips(); wireCommon(); wireBossTip(); wireDrawer(); wireLeadTip();
 
     if(state.phase==="select"){
       root.querySelectorAll("[data-pick]").forEach(btn=>{
@@ -7045,4 +6860,6 @@ footer.note{ display:none; }
   }catch(e){ render(); }
 
 })();
-</script></body></html>
+</script>
+</body>
+</html>
