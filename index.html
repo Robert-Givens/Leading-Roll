@@ -64,7 +64,7 @@ h1,h2,h3,.display{
   font-weight:400;
 }
 .mono{font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums;}
-.wrap{max-width:920px;margin:0 auto;}
+.wrap{max-width:920px;margin:auto;}
 button{font-family:inherit;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 button:focus-visible, a:focus-visible, [tabindex]:focus-visible{
   outline:2px solid var(--gold-bright); outline-offset:2px;
@@ -715,7 +715,16 @@ footer.note{max-width:920px; margin:22px auto 0; color:var(--cream-dim); font-si
 :root.eight-bit .title-marquee{ font-size:clamp(26px,8vw,48px); line-height:1.3; }
 :root.eight-bit .hand-name, :root.eight-bit .brand-mini{ font-size:13px !important; }
 
-body{ background:radial-gradient(ellipse 120% 50% at 50% -10%, color-mix(in srgb, var(--marquee-red) 22%, transparent), transparent 60%), var(--ink); padding-inline:12px; padding-block:calc(8px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-bottom)); min-height:100dvh; transition:background-color .4s; }
+/* display:flex + .wrap's margin:auto (above) vertically center #app when its
+   content is shorter than the viewport -- e.g. the dice-select play screen
+   on a tall phone, which was previously leaving a large empty band below the
+   card since #app (a plain block) only ever grew as tall as its own content,
+   never as tall as body's 100dvh. Auto margins collapse to 0 once content
+   is taller than the viewport, so scrolling degrades normally -- verified
+   safe since every other <body> child (#hold-tip, #options-back/.drawer-back,
+   #era-fx, #pop-layer, #egg-layer) is position:fixed and unaffected by body
+   becoming a flex container. */
+body{ display:flex; flex-direction:column; background:radial-gradient(ellipse 120% 50% at 50% -10%, color-mix(in srgb, var(--marquee-red) 22%, transparent), transparent 60%), var(--ink); padding-inline:12px; padding-block:calc(8px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-bottom)); min-height:100dvh; transition:background-color .4s; }
 h1,h2,h3,.display,.brand,.title-marquee,.hand-name,.brand-mini,.pop-card .h{ font-family:var(--f-display); }
 :root[data-era="contemporary"] .title-marquee, :root[data-era="contemporary"] .brand-mini{ font-weight:800; font-stretch:75%; letter-spacing:.01em; }
 .pixel,.point-num,.field-nums,.come-label,.ht-title,.field-badge,.lz-t,.sec-h,.g-tag{ font-family:var(--f-label); }
