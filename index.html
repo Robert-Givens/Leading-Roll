@@ -250,7 +250,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible{
   margin-top:4px;
 }
 @media (prefers-reduced-motion:no-preference){
-  .die.rolling{ animation:diceTumble .5s steps(4) infinite; }
+  /* --speed-mult (see applyTheme/speedMult) shortens the tumble to match
+     however fast Options has doRoll's own tick timer resolving the roll --
+     a Fastest roll that still visually spun for half a second would look
+     like the animation was lagging behind the result. */
+  .die.rolling{ animation:diceTumble calc(.5s * var(--speed-mult,1)) steps(4) infinite; }
   .idle-prompt.blink{ animation:blink 1.1s steps(1) infinite; }
 }
 @keyframes diceTumble{
@@ -751,6 +755,13 @@ footer.note{ display:none; }
 .round-dot{ width:7px; height:7px; }
 .boss-strip{ font-size:11px; color:var(--cream); background:color-mix(in srgb, var(--marquee-red) 30%, transparent); border:1px solid var(--marquee-red-bright); border-radius:7px; padding:4px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .boss-strip b{ color:var(--marquee-red-bright); }
+/* Shop/Next Up "Next: <Boss>" banner (see bossPreviewStrip) -- same pill as
+   the live in-play boss-strip above, but sitting on its own in a roomy
+   screen rather than squeezed into the HUD's one-line row, so unlike the
+   base class it wraps and reads its full twist text instead of eliding it --
+   the whole point here is to actually read and plan around it, not just
+   glance at a reminder mid-roll. */
+.boss-strip.boss-preview{ white-space:normal; overflow:visible; text-overflow:clip; line-height:1.4; font-size:12px; }
 .bump{ animation:numBump .45s cubic-bezier(.2,1.6,.4,1); display:inline-block; }
 @keyframes numBump{0%{transform:scale(1)}35%{transform:scale(1.35) rotate(-4deg)}100%{transform:scale(1)}}
 
@@ -834,6 +845,16 @@ footer.note{ display:none; }
 .drawer .stat-strip{ grid-template-columns:repeat(3,1fr); gap:6px; }
 .drawer .stat{ padding:6px 8px; } .drawer .stat .value{ font-size:15px; }
 
+/* ---- Options panel (reuses .drawer's own sheet/backdrop -- see
+   optionsPanelHtml/renderOptionsBack) ---- */
+.opt-block{ display:flex; flex-direction:column; gap:7px; }
+.opt-block + .opt-block{ border-top:1px solid var(--line); padding-top:12px; }
+.opt-label{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:12px; color:var(--gold-bright); letter-spacing:0.06em; text-transform:uppercase; }
+.opt-label small{ font-family:'Libre Franklin',sans-serif; font-size:10px; color:var(--cream-dim); letter-spacing:0.02em; text-transform:none; }
+.opt-val{ font-family:'JetBrains Mono',monospace; color:var(--cream-dim); font-size:11px; letter-spacing:0; text-transform:none; font-variant-numeric:tabular-nums; }
+.opt-row{ flex-direction:row; justify-content:space-between; align-items:center; }
+.opt-range{ width:100%; accent-color:var(--gold-bright); height:22px; }
+
 /* ---- generic compact screen ---- */
 .screen{ display:flex; flex-direction:column; gap:10px; margin-top:8px; }
 .sec{ border:1px solid var(--line); border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.14)), var(--curtain); padding:8px; }
@@ -883,6 +904,14 @@ footer.note{ display:none; }
 #era-fx > i{ position:absolute; inset:0; display:block; }
 :where(#era-fx > i){ opacity:0; }
 .fx-grain{ background-image:var(--grain); background-size:160px; mix-blend-mode:overlay; }
+/* Film-grain toggle (see grainOff/toggleGrain/grainBtn in the script) --
+   !important because every era below sets .fx-grain's opacity to its own
+   number (search .fx-grain further down); a plain selector here would lose
+   to every one of those on specificity alone (:root[data-era=".."] .fx-grain
+   out-specifies a lone class-plus-ancestor selector) regardless of source
+   order, so !important is the only way one rule silences grain across every
+   era without repeating this override once per era. */
+.grain-off .fx-grain{ opacity:0 !important; }
 @media (prefers-reduced-motion:no-preference){ .fx-grain{ animation:grainMove .5s steps(4) infinite; } .fx-rain{ animation:rainMove .35s linear infinite; } .fx-vhs{ animation:vhsTrack 5s linear infinite; } .fx-flare{ animation:flareDrift 6s ease-in-out infinite alternate; } :root[data-era="silent"] .fx-vig{ animation:flickerA .12s infinite alternate; } }
 @keyframes grainMove{0%{background-position:0 0}25%{background-position:-40px 30px}50%{background-position:60px -20px}75%{background-position:-20px -50px}}
 .fx-rain{ background:repeating-linear-gradient(100deg, transparent 0 14px, rgba(255,255,255,.1) 14px 15px, transparent 15px 37px); background-size:120px 120px; }
@@ -908,7 +937,7 @@ footer.note{ display:none; }
 
 /* ---- pop-ups ---- */
 #pop-layer{ position:fixed; left:0; right:0; top:30%; z-index:60; pointer-events:none; display:grid; place-items:center; }
-.pop-toast{ position:absolute; top:0; left:50%; transform:translateX(-50%); font-family:var(--f-display); font-size:26px; color:var(--gold-bright); text-shadow:0 3px 0 rgba(0,0,0,.6), 0 0 18px rgba(0,0,0,.7); white-space:nowrap; animation:toastUp 1.4s cubic-bezier(.2,.9,.3,1) forwards; text-align:center; }
+.pop-toast{ position:absolute; top:0; left:50%; transform:translateX(-50%); font-family:var(--f-display); font-size:26px; color:var(--gold-bright); text-shadow:0 3px 0 rgba(0,0,0,.6), 0 0 18px rgba(0,0,0,.7); white-space:nowrap; animation:toastUp calc(1.4s * var(--speed-mult,1)) cubic-bezier(.2,.9,.3,1) forwards; text-align:center; }
 .pop-toast small{ display:block; font-family:'JetBrains Mono',monospace; font-size:14px; color:#fff; letter-spacing:.08em; }
 .pop-toast.loss{ color:var(--marquee-red-bright); font-size:20px; }
 @keyframes toastUp{0%{opacity:0; transform:translate(-50%,20px) scale(.6)}15%{opacity:1; transform:translate(-50%,0) scale(1.1)}25%{transform:translate(-50%,0) scale(1)}80%{opacity:1}100%{opacity:0; transform:translate(-50%,-50px)}}
@@ -1076,6 +1105,11 @@ footer.note{ display:none; }
      inside. showHoldTip/hideHoldTip (see the script) are the only things
      that ever touch it. -->
 <div id="hold-tip" class="hold-tip"></div>
+<!-- Also lives outside #app, same reason as #hold-tip above: the Options
+     panel needs to stay open and keep its own state (slider drags, which
+     speed tier is lit up) across a screen's own re-render, from any screen
+     it was opened on -- see optionsOpen/renderOptionsBack/wireOptionsPanel. -->
+<div id="options-back" class="drawer-back" hidden></div>
 <div id="era-fx" aria-hidden="true"><i class="fx-grain"></i><i class="fx-rain"></i><i class="fx-scan"></i><i class="fx-vhs"></i><i class="fx-flare"></i><i class="fx-vig"></i><i class="fx-blinds"></i></div>
 <div class="vhs-osd" id="vhs-osd" aria-hidden="true">PLAY ▶</div>
 <div id="pop-layer" aria-live="polite"></div>
@@ -1965,6 +1999,28 @@ footer.note{ display:none; }
   // first in pickDieKind, before the ultra-rare and rare rolls even
   // happen, so it never competes with them for the same offer slot.
   const DICE_SHOP_LEGENDARY_POOL = ["body_double"];
+  // A die offer's shop-card border used to be its own DIE_KINDS tint (every
+  // die's individual flavor color, same one used in the dice tray/picker
+  // elsewhere) with the RARITY spelled out in the card's text label instead
+  // ("Legendary"/"Ultra-rare"/"Rare"/"Die") -- flipped the other way now:
+  // the label is always just "Die" (see renderShop), and the border color
+  // is what tells rarity apart at a glance, borrowing colors that already
+  // carry the same weight elsewhere in this UI rather than inventing a new
+  // palette -- gold is Body Double's own tint (and this game's existing
+  // "foil" color generally), purple is the Hardways' own accent (#c48bde,
+  // used throughout .hard-tile/.zone-hardways), blue is Come's own accent
+  // (#8ec6e6, used throughout .zone-come), and the common tier reuses
+  // Steel Die's own neutral tan (#c9bba3) since a plain common die is
+  // exactly the "no frills" case that color was already standing in for.
+  // Every other die-related color (the tray, the dice picker, hold-tips) is
+  // unaffected -- this only ever feeds the shop offer card's --genre-color.
+  const DIE_RARITY_COLOR = { legendary:"#f2c96b", ultra_rare:"#c48bde", rare:"#8ec6e6", common:"#c9bba3" };
+  function dieRarityColorFor(dieKind){
+    if(DICE_SHOP_LEGENDARY_POOL.includes(dieKind)) return DIE_RARITY_COLOR.legendary;
+    if(DICE_SHOP_ULTRA_RARE_POOL.includes(dieKind)) return DIE_RARITY_COLOR.ultra_rare;
+    if(DICE_SHOP_RARE_POOL.includes(dieKind)) return DIE_RARITY_COLOR.rare;
+    return DIE_RARITY_COLOR.common;
+  }
   const RARE_DIE_CHANCE = 0.15; // per offer slot, each shop visit -- see pickDieKind
   const ULTRA_RARE_DIE_CHANCE = 0.04; // per offer slot, each shop visit -- checked before RARE_DIE_CHANCE, see pickDieKind
   const LEGENDARY_DIE_CHANCE = 0.02; // per offer slot, each shop visit -- checked before ULTRA_RARE_DIE_CHANCE, see pickDieKind
@@ -2187,6 +2243,16 @@ footer.note{ display:none; }
       // checkBudgetOut (0u Score is a hard loss on its own, independent of
       // this -- Payroll hitting 0 is never a loss condition at all).
       target:10+targetFor(1,0),
+      // This Act's Director's Cut boss for the CURRENT ante -- drawn once,
+      // at the very start of the ante (tierIdx 0, Read Through -- see
+      // beginScreening), not withheld until the boss round itself. Stays
+      // set through Read Through and Rehears-Roll so both of this ante's
+      // shop visits and Next Up screens can preview it (renderShop/
+      // renderBlindSelect), same as a Balatro run showing every blind for
+      // the ante up front. null between an ante wrap and that draw (see
+      // settleRound) -- there is deliberately a brief window, the one shop
+      // visit right after beating a boss, where the NEXT ante's boss isn't
+      // known yet either, same as it never used to be known before this.
       bossId:null,
       // Every boss id drawn so far this run (see beginScreening's own
       // no-repeat draw and bossPoolFor) -- cleared back to empty once every
@@ -3061,7 +3127,10 @@ footer.note{ display:none; }
     state.rollNumber = 0;
     state.lastRoll = null;
     state.log = [];
-    state.bossId = null;
+    // NOT reset to null here any more -- see freshState's comment on
+    // state.bossId. It's drawn once below, at tierIdx 0, and deliberately
+    // left alone for the rest of the ante (tierIdx 1 and 2) so it survives
+    // this same per-scene reset at Rehears-Roll and the boss round itself.
     state.point = null;
     state.roundComplete = false;
     state.roundCompleteEarly = false;
@@ -3136,7 +3205,13 @@ footer.note{ display:none; }
       state.selectedDiceIds = [];
       state.phase = "select";
     }
-    if(state.tierIdx===2){
+    if(state.tierIdx===0){
+      // Draw THIS ANTE's boss now, at Read Through, instead of waiting
+      // until the Director's Cut round itself -- see freshState's comment
+      // on state.bossId. It's revealed here so every screen for the rest
+      // of the ante (both shop visits, all three Next Up previews) can show
+      // it, giving you the whole ante -- not just the boss round's own
+      // last-second preview -- to actually shop for it.
       const pool = bossPoolFor();
       // Never draw a boss this run has already seen while there's still an
       // unseen one available (the actual bug report this fixes: the same
@@ -3152,7 +3227,15 @@ footer.note{ display:none; }
       const boss = unseen[Math.floor(Math.random()*unseen.length)];
       state.bossId = boss.id;
       state.seenBossIds.push(boss.id);
-      if(boss.retakeAdjust) state.retakesLeft = Math.max(0, state.retakesLeft + boss.retakeAdjust);
+    } else if(state.tierIdx===2 && state.bossId){
+      // This ante's boss was already picked back at Read Through (above)
+      // and has just been sitting in state.bossId, previewed but otherwise
+      // inert, through Rehears-Roll -- this is the moment its twist
+      // actually takes hold, so a retake-adjusting boss (Recast Rumors and
+      // the like) doesn't quietly cost or grant a Retake during either of
+      // the two earlier rounds it was only being ADVERTISED in.
+      const boss = BOSS_BLINDS.find(b=>b.id===state.bossId);
+      if(boss && boss.retakeAdjust) state.retakesLeft = Math.max(0, state.retakesLeft + boss.retakeAdjust);
     }
   }
 
@@ -4047,30 +4130,28 @@ footer.note{ display:none; }
   // 5 fully-pickable dice. Play stops cold: a prompt (renderDieLostPrompt)
   // interrupts before anything else renders, and behind it state.phase
   // drops back to "select" so you have to pick 2 new dice before rolling
-  // again. Any active die can go, standard included -- there's no
-  // favoritism for plain dice here, only a die's own lossGuard field (Six,
-  // Sure Grip and any future compound die pairing it in) changes the odds.
-  // Body Double is no exception either -- see DIE_KINDS' own comment, it
-  // carries no lossGuard of its own, so it's exactly as vulnerable as any
-  // plain die despite filling both active slots by itself.
+  // again. Only a die that actually HAS something to lose is ever at risk
+  // -- a die's own lossGuard field (Six, Sure Grip and any future compound
+  // die pairing it in) changes the odds, but a plain Standard Die has no
+  // ability to strip in the first place, so it's excluded from the victim
+  // pool entirely (see the filter below) rather than "rolling off the
+  // table" into... the exact same Standard Die. Body Double is not exempt
+  // this way -- see DIE_KINDS' own comment, it carries no lossGuard of its
+  // own and its kind isn't "standard", so it's exactly as vulnerable as any
+  // other real die despite filling both active slots by itself.
   //
-  // A die already sitting in state.sidelinedDice THIS SCENE (its real kind
-  // already stripped down to a Standard stand-in by an earlier loss) is
-  // excluded from ever being picked as the victim again. It has nothing
-  // left to lose -- rolling it "off the table" a second time would just
-  // force the exact same push-and-reselect interrupt for zero stakes,
-  // which reads as a pointless annoyance rather than a real risk (reported
-  // by the user: a Standard stand-in feels like it "can't roll off the
-  // table" because losing it again changes nothing). A die that started the
-  // scene as a genuine Standard Die and hasn't been swapped is NOT excluded
-  // -- it's still a real, un-neutered die with a real ability (none) to
-  // protect, same as any other, so it stays exactly as vulnerable as ever;
-  // this only ever excludes a slot that already paid this scene's price.
-  // Returns the DIE_KINDS entry for whichever die got swapped out, or null
-  // if nothing happened this roll (including "everyone left standing is
-  // already a stand-in, so there was nothing at risk to check").
+  // The victim pool excludes any die whose CURRENT kind is "standard" --
+  // covers both a die that started the scene that way and one already
+  // stripped down to a Standard stand-in by an earlier loss this scene
+  // (state.sidelinedDice, restored next beginScreening()). Either way it has
+  // nothing left to lose: rolling it "off the table" would just force the
+  // same push-and-reselect interrupt for zero stakes, a pointless annoyance
+  // rather than a real risk (reported by the user). Returns the DIE_KINDS
+  // entry for whichever die got swapped out, or null if nothing happened
+  // this roll (including "everyone left standing is already Standard, so
+  // there was nothing at risk to check").
   function maybeLoseDie(sum){
-    const active = getActiveDice().filter(d=>!state.sidelinedDice.some(s=>s.uid===d.uid));
+    const active = getActiveDice().filter(d=>d.kind!=="standard" && !state.sidelinedDice.some(s=>s.uid===d.uid));
     if(!active.length) return null;
     const victim = active[Math.floor(Math.random()*active.length)];
     const kindDef = DIE_KINDS[victim.kind];
@@ -4208,7 +4289,10 @@ footer.note{ display:none; }
     const dieBEl = document.getElementById('die-b');
     let ticks = 0;
     const totalTicks = 7;
-    const tickMs = 75;
+    // Options' Game Speed (see speedMult) shortens the tumble itself rather
+    // than skipping it outright -- floored so Fastest still visibly rattles
+    // a couple of ticks instead of the dice just silently snapping to rest.
+    const tickMs = Math.max(18, Math.round(75*speedMult()));
     const iv = setInterval(()=>{
       ticks += 1;
       if(dieAEl) dieAEl.innerHTML = dieFaceSVG(1+Math.floor(Math.random()*6));
@@ -4515,6 +4599,15 @@ footer.note{ display:none; }
       state.ante += 1;
       state.highestAnte = state.ante;
       restockIfNewAct();
+      // The boss just cleared (tier 2) no longer has anything to preview --
+      // null it back out until beginScreening's own tierIdx-0 draw picks
+      // the NEXT ante's boss (not until "Next Scene" is actually clicked
+      // from the shop this settleRound is about to open, see enterShop
+      // below). The one shop visit in between deliberately shows no boss
+      // banner (renderShop/renderBlindSelect both check state.bossId) --
+      // same as it always used to, since that ante genuinely hasn't started
+      // yet and there's nothing real to prepare for.
+      state.bossId = null;
     }
     // Ante 9+ only ends the run the FIRST time through -- once Endless has
     // been switched on (see the win screen's "Keep Rolling" button and
@@ -5190,6 +5283,20 @@ footer.note{ display:none; }
     for(let i=0;i<d.data.length;i+=4){ const v=Math.random()*255; d.data[i]=d.data[i+1]=d.data[i+2]=v; d.data[i+3]=60; }
     x.putImageData(d,0,0); document.documentElement.style.setProperty("--grain",`url(${c.toDataURL()})`); }catch(e){} })();
 
+  // Film-grain toggle (off by default, i.e. grain shows unless a player has
+  // explicitly turned it off) -- same on/off-in-localStorage shape as sound
+  // just below, its own key so the two are independent. Only ever silences
+  // .fx-grain (the noisy texture layer, see the CSS rule right after
+  // .fx-grain's own opacity-per-era rules below) -- the rest of #era-fx
+  // (scanlines, VHS tracking, vignette, light leak, window blinds) is a
+  // separate per-era "look," untouched, since the request was specifically
+  // about grain reading as eye strain, not the whole era-fx stack.
+  let grainOff = false; try{ grainOff = localStorage.getItem("leadingRoll.grainOff")==="1"; }catch(e){}
+  function toggleGrain(){
+    grainOff = !grainOff; try{ localStorage.setItem("leadingRoll.grainOff", grainOff?"1":"0"); }catch(e){}
+    render();
+  }
+
   let appliedEra = null;
   function applyTheme(){
     const id = themeEraFor();
@@ -5198,6 +5305,12 @@ footer.note{ display:none; }
     html.dataset.screen = state.screen;
     html.classList.toggle("raining", state.screen!=="play" || !!state.noirRain);
     html.classList.toggle("eight-bit", !!loadEggs().eightBit);
+    // Every render, not gated behind the appliedEra early-return below --
+    // toggleGrain() itself calls render() straight away (same as
+    // setGameSpeed()/togglePopups()), so this has to take effect immediately
+    // regardless of whether the era also happens to be changing this render.
+    html.classList.toggle("grain-off", grainOff);
+    html.style.setProperty("--speed-mult", speedMult());
     if(appliedEra===id) return;
     appliedEra = id;
     html.dataset.era = id;
@@ -5205,11 +5318,36 @@ footer.note{ display:none; }
     html.style.setProperty("--felt-img", u==="none" ? "none" : `url(${u})`);
   }
 
-  /* ---- sound (off by default; one short synthesized sting per Era) ---- */
-  let soundOn = false; try{ soundOn = localStorage.getItem("leadingRoll.sound")==="1"; }catch(e){}
+  /* ---- sound (two independent volume sliders, off by default -- see the
+     Options screen). Everything is still synthesized WebAudio, same as
+     before; there's no actual music TRACK here, just one short per-era
+     "sting" that plays when a round resolves -- Music volume scales that,
+     SFX volume scales every other one-off tone (dice-tick fanfare, crowd
+     reactions, Easter-egg stings). A saved value from the old single on/off
+     toggle is migrated once below so a player who'd turned sound on doesn't
+     land back at silence. ---- */
+  let musicVol = 0, sfxVol = 0;
+  try{
+    const legacy = localStorage.getItem("leadingRoll.sound");
+    const mv = localStorage.getItem("leadingRoll.musicVol");
+    const sv = localStorage.getItem("leadingRoll.sfxVol");
+    musicVol = mv!=null ? +mv : (legacy==="1" ? 70 : 0);
+    sfxVol = sv!=null ? +sv : (legacy==="1" ? 70 : 0);
+    if(!(musicVol>=0 && musicVol<=100)) musicVol = 0;
+    if(!(sfxVol>=0 && sfxVol<=100)) sfxVol = 0;
+  }catch(e){}
+  function musicGain(){ return musicVol/100; }
+  function sfxGain(){ return sfxVol/100; }
+  function setMusicVol(v){ musicVol = Math.max(0,Math.min(100,Math.round(v))); try{ localStorage.setItem("leadingRoll.musicVol", String(musicVol)); }catch(e){} const a=ac(); if(a && a.resume) a.resume(); }
+  function setSfxVol(v){ sfxVol = Math.max(0,Math.min(100,Math.round(v))); try{ localStorage.setItem("leadingRoll.sfxVol", String(sfxVol)); }catch(e){} const a=ac(); if(a && a.resume) a.resume(); }
   let actx = null;
   function ac(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } return actx; }
-  function tone(f, t0, dur, type, vol, opt){
+  // The real oscillator/gain-node builder. Every call site outside sting()
+  // reaches this through the sfxGain()-scaled `tone` wrapper just below;
+  // sting() shadows that name with its own musicGain()-scaled version (see
+  // there) so its ~10 existing per-era tone(...) calls didn't need touching
+  // individually to end up on the Music slider instead of SFX.
+  function _tone(f, t0, dur, type, vol, opt){
     const a=ac(); if(!a) return; opt=opt||{}; type=type||"sine"; vol=vol||.12;
     const o=a.createOscillator(), g=a.createGain(); let node=o;
     o.type=type; o.frequency.setValueAtTime(f,t0); if(opt.to) o.frequency.exponentialRampToValueAtTime(opt.to,t0+dur);
@@ -5218,9 +5356,14 @@ footer.note{ display:none; }
     g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(vol,t0+.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
     node.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+dur+.05);
   }
+  function tone(f, t0, dur, type, vol, opt){ return _tone(f, t0, dur, type, (vol||.12)*sfxGain(), opt); }
   const midi = n=>440*Math.pow(2,(n-69)/12);
   function sting(kind){
-    if(!soundOn) return; const a=ac(); if(!a) return; const t=a.currentTime+.02; const sad=kind==="out"; const id=CUR_ERA;
+    if(musicGain()<=0) return; const a=ac(); if(!a) return; const t=a.currentTime+.02; const sad=kind==="out"; const id=CUR_ERA;
+    // Shadows the module-level `tone` above for the rest of this function
+    // only -- same per-era voicings as before, just routed onto the Music
+    // slider instead of SFX, with zero changes to any of the calls below.
+    const tone = (f,t0,dur,type,vol,opt)=>_tone(f,t0,dur,type,(vol||.12)*musicGain(),opt);
     try{
       if(id==="silent"){ (sad?[67,63,60,55]:[60,64,67,72,76]).forEach((n,i)=>tone(midi(n),t+i*.09,.35,"triangle",.14)); }
       else if(id==="golden"){ (sad?[58,61,65]:[60,64,67,72]).forEach(n=>{ tone(midi(n),t,.9,"sawtooth",.05,{lp:[900,2400]}); tone(midi(n),t+.18,.9,"sawtooth",.04,{lp:[900,2400]}); }); }
@@ -5228,16 +5371,26 @@ footer.note{ display:none; }
       else if(id==="classic"){ tone(midi(sad?72:60),t,1.1,"sine",.14,{to:midi(sad?55:79),vib:9}); }
       else if(id==="new_hollywood"){ (sad?[52,50,47]:[52,55,57,59]).forEach((n,i)=>tone(midi(n),t+i*.14,.25,"sawtooth",.08,{lp:[300,2200],q:12})); }
       else if(id==="blockbuster"){ (sad?[72,67,63,60,55]:[60,64,67,72,76,79,84]).forEach((n,i)=>tone(midi(n),t+i*.06,.12,"square",.05)); }
-      else if(id==="modern"){ tone(160,t,.25,"sine",.3,{to:40}); const b=a.createBufferSource(), buf=a.createBuffer(1,Math.floor(a.sampleRate*.15),a.sampleRate), d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length); b.buffer=buf; const g=a.createGain(); g.gain.value=.25; b.connect(g); g.connect(a.destination); b.start(t+.12); if(!sad) tone(midi(76),t+.3,.2,"square",.05); }
+      else if(id==="modern"){ tone(160,t,.25,"sine",.3,{to:40}); const b=a.createBufferSource(), buf=a.createBuffer(1,Math.floor(a.sampleRate*.15),a.sampleRate), d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length); b.buffer=buf; const g=a.createGain(); g.gain.value=.25*musicGain(); b.connect(g); g.connect(a.destination); b.start(t+.12); if(!sad) tone(midi(76),t+.3,.2,"square",.05); }
       else if(id==="century21"){ [36,43,48].forEach(n=>tone(midi(n-(sad?1:0)),t,1.6,"sawtooth",.09,{lp:[200,900],q:2})); }
       else { tone(midi(sad?64:84),t,.18,"sine",.12); tone(midi(sad?60:91),t+.1,.3,"sine",.1); }
     }catch(e){}
   }
-  function toggleSound(){
-    soundOn = !soundOn; try{ localStorage.setItem("leadingRoll.sound", soundOn?"1":"0"); }catch(e){}
-    if(soundOn){ const a=ac(); if(a && a.resume) a.resume(); sting("win"); }
-    render();
-  }
+
+  /* ---- popups (score toasts & big celebration cards -- see popToast/
+     popCard) and game speed (dice-tumble pacing, the score-chain celebration
+     sequence, and how long a pop-up card lingers -- see doRoll/playChain/
+     popCard). Both on by default at Normal speed, independent of sound. ---- */
+  let popupsOn = true; try{ const v = localStorage.getItem("leadingRoll.popups"); if(v!=null) popupsOn = v!=="0"; }catch(e){}
+  function togglePopups(){ popupsOn = !popupsOn; try{ localStorage.setItem("leadingRoll.popups", popupsOn?"1":"0"); }catch(e){} render(); }
+  const GAME_SPEED_TIERS = [ {id:"normal",label:"Normal",mult:1}, {id:"fast",label:"Fast",mult:0.55}, {id:"fastest",label:"Fastest",mult:0.25} ];
+  let gameSpeed = "normal"; try{ const v = localStorage.getItem("leadingRoll.gameSpeed"); if(GAME_SPEED_TIERS.some(t=>t.id===v)) gameSpeed = v; }catch(e){}
+  function speedMult(){ const t = GAME_SPEED_TIERS.find(t=>t.id===gameSpeed); return t ? t.mult : 1; }
+  function setGameSpeed(id){ if(!GAME_SPEED_TIERS.some(t=>t.id===id)) return; gameSpeed = id; try{ localStorage.setItem("leadingRoll.gameSpeed", id); }catch(e){} render(); }
+  // Whether the Options panel (#options-back, outside #app -- see the static
+  // HTML) is open. Not persisted -- it's a transient UI state, not a
+  // preference, and starts closed on every fresh load same as the drawer.
+  let optionsOpen = false;
 
   /* ---- particles ---- */
   const particleCanvas = document.getElementById("particles");
@@ -5279,30 +5432,39 @@ footer.note{ display:none; }
   const sleepMs = ms=>new Promise(r=>setTimeout(r,ms));
   let popQueue = Promise.resolve();
   function popToast(text, amt, loss){
+    if(!popupsOn) return; // Options: Pop-ups off -- this one's purely visual, no sound of its own to preserve
     const layer=document.getElementById("pop-layer"); if(!layer) return;
     const el=document.createElement("div"); el.className="pop-toast"+(loss?" loss":"");
     el.innerHTML = text + (amt!=null ? `<small>${amt>0?"+":""}${fmtU(amt)}u</small>` : "");
-    layer.appendChild(el); setTimeout(()=>el.remove(),1500);
+    layer.appendChild(el); setTimeout(()=>el.remove(),1500*speedMult());
   }
   function popCard(kind, amt, keyText){
     popQueue = popQueue.then(async ()=>{
+      if(state.screen!=="play") return; // moved on (Take 5, game over) -- drop stale celebrations, sting included
+      // The per-era win/lose music cue (see sting) is this card's whole
+      // reason for existing -- it plays regardless of the Options Pop-ups
+      // toggle below, which only ever hides the VISUAL card/confetti/shake,
+      // same as Music/SFX volume are independent of it in the other
+      // direction. See popToast just above for the purely-visual sibling
+      // popup that has no sound to preserve.
+      sting(kind);
+      if(!popupsOn) return;
       const layer=document.getElementById("pop-layer"); if(!layer) return;
-      if(state.screen!=="play") return; // moved on (Take 5, game over) -- drop stale celebrations
       const th=curTheme();
       // Plain words only -- the Era styling carries the theme, not slang.
       const heads = { big:"Big payout", streak:(keyText||"Hot streak"), heat:"Heat maxed", out:"Seven out", clear:"Target hit" };
       const rank = kind==="out"?"✕":kind==="big"?"$":kind==="heat"?"🔥":kind==="clear"?"★":String(state.winStreak||"");
       const el=document.createElement("div"); el.className="pop-card";
       el.innerHTML = `<div class="rank">${kind==="heat"?"H":rank}</div><div><div class="h">${heads[kind]}</div>${amt?`<div class="amt">+0u</div>`:""}</div>`;
-      layer.appendChild(el); sting(kind);
+      layer.appendChild(el);
       const app=document.getElementById("app");
       if(app && (kind==="big"||kind==="out")){ app.classList.remove("shake"); void app.offsetWidth; app.classList.add("shake"); }
       if(CUR_ERA==="new_hollywood" && kind!=="out") document.documentElement.classList.add("freeze");
       if(kind!=="out"){ const [x,y]=tableCenter(); burst(th.parts,x,y,kind==="big"?80:45); }
-      if(amt){ const a=el.querySelector(".amt"); const t0=performance.now(), dur=800;
-        await new Promise(res=>{ (function step(now){ const p=Math.min(1,(now-t0)/dur); a.textContent="+"+fmtU(Math.round(amt*(1-Math.pow(1-p,3))))+"u"; if(p<1) requestAnimationFrame(step); else res(); })(t0); }); }
-      await sleepMs(kind==="out"?1100:900);
-      el.classList.add("out"); document.documentElement.classList.remove("freeze"); await sleepMs(300); el.remove();
+      if(amt){ const a=el.querySelector(".amt"); const t0=performance.now(), dur=800*speedMult();
+        await new Promise(res=>{ (function step(now){ const p=Math.min(1,dur<=0?1:(now-t0)/dur); a.textContent="+"+fmtU(Math.round(amt*(1-Math.pow(1-p,3))))+"u"; if(p<1) requestAnimationFrame(step); else res(); })(t0); }); }
+      await sleepMs((kind==="out"?1100:900)*speedMult());
+      el.classList.add("out"); document.documentElement.classList.remove("freeze"); await sleepMs(300*speedMult()); el.remove();
     }).catch(()=>{});
     return popQueue;
   }
@@ -5339,7 +5501,7 @@ footer.note{ display:none; }
       for(let i=0;i<10;i++){ burst("fire",VW()*i/10,VH()*.74,7); await sleepMs(45); } eggTrack.rewind=true; await eggClear(1600); render(); },
     async pie(){ const s=eggEl(`<svg viewBox="0 0 200 200" width="100%" height="100%"><path fill="#fffaf0" d="M100 20c18 0 20 22 38 20s30-10 34 8-14 26-4 40 30 18 20 36-30 6-38 22-4 36-24 34-16-22-32-26-34 18-46 4 6-30-6-44-34-10-30-30 28-14 30-32-16-30 2-38 28 8 40 4 8-18 16-18z"/><circle cx="70" cy="80" r="10" fill="#f3e3b8"/><circle cx="130" cy="120" r="14" fill="#f3e3b8"/></svg>`,"","position:absolute;left:50%;top:45%;width:min(70vw,420px);height:min(70vw,420px);transform:translate(-50%,-50%) scale(0)");
       eggEl(`<span style="font-family:Shrikhand,serif">Splat.</span>`,"egg-text","top:78%;-webkit-text-stroke:2px #000");
-      if(soundOn){ const a=ac(); if(a) tone(1400,a.currentTime,.7,"sine",.1,{to:300}); }
+      if((sfxGain()>0)){ const a=ac(); if(a) tone(1400,a.currentTime,.7,"sine",.1,{to:300}); }
       await eggAnim(s,[{transform:"translate(-50%,-50%) scale(0) rotate(-30deg)"},{transform:"translate(-50%,-50%) scale(1.1) rotate(4deg)"},{transform:"translate(-50%,-50%) scale(1)"}],{duration:350,easing:"cubic-bezier(.2,1.4,.4,1)"});
       await sleepMs(700); await eggAnim(s,[{transform:"translate(-50%,-50%)"},{transform:`translate(-50%,${VH()}px) scaleY(1.4)`}],{duration:1300,easing:"ease-in"}); await eggClear(); },
     async promotion(){ const d=eggEl("","dim-screen","background:rgba(0,0,0,.4)");
@@ -5359,7 +5521,7 @@ footer.note{ display:none; }
       await sleepMs(600); eggAnim(d,[{opacity:1},{opacity:0}],{duration:400}); await eggClear(450); },
     async showstopper(){ const d=eggEl("","dim-screen","background:radial-gradient(circle at 50% 45%, transparent 0 110px, rgba(0,0,0,.85) 150px)");
       eggEl(`<span style="font-family:Limelight,serif">Showstopper!</span>`,"egg-text","color:#fff27a");
-      for(let i=0;i<4;i++){ burst("notes",VW()/2,VH()*.45,9); if(soundOn){ const a=ac(); if(a) tone(midi([67,72,76,79][i]),a.currentTime,.25,"triangle",.1); } await sleepMs(400); }
+      for(let i=0;i<4;i++){ burst("notes",VW()/2,VH()*.45,9); if((sfxGain()>0)){ const a=ac(); if(a) tone(midi([67,72,76,79][i]),a.currentTime,.25,"triangle",.1); } await sleepMs(400); }
       await eggAnim(d,[{opacity:1},{opacity:0}],{duration:450}); await eggClear(); },
     async meanwhile(){ const d=eggEl(`<div style="position:absolute;inset:0;display:grid;place-items:center"><div style="border:3px double #efe6d2;padding:24px 30px;font-family:'IM Fell English SC',serif;font-size:clamp(20px,5vw,32px);color:#efe6d2;text-align:center;max-width:86vw">Meanwhile, back at the table…</div></div>`,"dim-screen","background:#0c0b0a;clip-path:circle(0% at 50% 50%)");
       await eggAnim(d,[{clipPath:"circle(0% at 50% 50%)"},{clipPath:"circle(75% at 50% 50%)"}],{duration:650}); await sleepMs(1300);
@@ -5371,19 +5533,19 @@ footer.note{ display:none; }
     async the_dame(){ const d=eggEl("","dim-screen","background:repeating-linear-gradient(-28deg, rgba(0,0,0,.93) 0 26px, rgba(40,40,40,.86) 26px 52px)");
       const t=eggEl("","egg-text","font-family:'Special Elite',monospace;font-size:clamp(17px,4.4vw,26px);white-space:normal;width:min(520px,86vw);text-align:left;color:#e9e4d8");
       const line="She walked into my joint with a pair of loaded dice and a story I wanted to believe.";
-      for(let i=0;i<=line.length;i++){ t.textContent=line.slice(0,i)+"▌"; if(soundOn && i%2){ const a=ac(); if(a) tone(900+Math.random()*300,a.currentTime,.03,"square",.03); } await sleepMs(reduceMotion?0:30); }
+      for(let i=0;i<=line.length;i++){ t.textContent=line.slice(0,i)+"▌"; if((sfxGain()>0) && i%2){ const a=ac(); if(a) tone(900+Math.random()*300,a.currentTime,.03,"square",.03); } await sleepMs(reduceMotion?0:30); }
       await sleepMs(1000); await eggAnim(d,[{opacity:1},{opacity:0}],{duration:400}); await eggClear(); },
     async three_d(){ const h=document.documentElement; h.classList.add("anaglyph");
       eggEl(`<span style="font-family:Bungee,sans-serif;filter:drop-shadow(-4px 0 0 rgba(255,0,60,.9)) drop-shadow(4px 0 0 rgba(0,220,255,.9))">Put on your 3-D glasses!</span>`,"egg-text","top:14%;font-size:clamp(17px,5vw,30px)");
       await sleepMs(3200); h.classList.remove("anaglyph"); await eggClear(); },
     async bankroll(){ const f=eggEl(`<svg viewBox="0 0 70 60" width="70" height="60"><path d="M5 58 C25 50 38 20 52 2 C54 20 58 42 68 58Z" fill="#3b4750" stroke="#1d2328" stroke-width="2"/></svg>`,"","position:absolute;bottom:22%;left:-80px");
       eggEl(`<span style="font-family:Shrikhand,serif">You're gonna need a bigger bankroll.</span>`,"egg-text","font-size:clamp(17px,4.6vw,30px);white-space:normal;width:86vw;color:#fff1d6");
-      if(soundOn){ const a=ac(); if(a) for(let i=0;i<8;i++){ tone(midi(i%2?41:40),a.currentTime+i*(0.5-i*0.045),.2,"sawtooth",.1,{lp:[300,300]}); } }
+      if((sfxGain()>0)){ const a=ac(); if(a) for(let i=0;i<8;i++){ tone(midi(i%2?41:40),a.currentTime+i*(0.5-i*0.045),.2,"sawtooth",.1,{lp:[300,300]}); } }
       await eggAnim(f,[{transform:"translateX(0)"},{transform:`translateX(${VW()*.5}px) translateY(-14px)`},{transform:`translateX(${VW()+120}px)`}],{duration:3000}); await eggClear(); },
     async eight_bit(){ const on = !!loadEggs().eightBit;
       eggEl("","dim-screen","background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 4px,transparent 4px 8px),repeating-linear-gradient(90deg,rgba(0,0,0,.35) 0 4px,transparent 4px 8px);opacity:.6");
       eggEl(`<span style="font-family:'Press Start 2P',monospace;color:#46f1ff;text-shadow:0 0 12px #ff2fb4">8-BIT MODE ${on?"ON":"OFF"}</span><div style="font-family:'JetBrains Mono',monospace;font-size:13px;margin-top:10px;color:#ffe74a">↑ ↑ ↓ ↓ ← → ← →</div>`,"egg-text","font-size:clamp(16px,5vw,30px)");
-      if(soundOn){ const a=ac(); if(a) [60,64,67,72,67,72,76,84].forEach((n,i)=>tone(midi(n),a.currentTime+i*.07,.09,"square",.05)); }
+      if((sfxGain()>0)){ const a=ac(); if(a) [60,64,67,72,67,72,76,84].forEach((n,i)=>tone(midi(n),a.currentTime+i*.07,.09,"square",.05)); }
       await eggClear(2300); },
     async bullet_time(){ const tray=document.querySelector(".dice-tray");
       eggEl(`<span style="font-family:Bungee,sans-serif;text-shadow:3px 0 #ff2fb4,-3px 0 #1cc6b6">Bullet Time</span>`,"egg-text","top:14%;font-size:clamp(20px,5vw,34px)");
@@ -5394,7 +5556,7 @@ footer.note{ display:none; }
       const roll=eggEl(`<div style="font-family:Cinzel,serif;text-align:center;color:#e8eef2;letter-spacing:.2em;line-height:2.2;font-size:13px">${["DIRECTED BY THE DICE","PRODUCED BY THE HOUSE","DEALER · THE DEALER","STICKMAN · STILL THE DEALER","CATERING · COMPED","NO DICE WERE HARMED"].join("<br>")}</div>`,"","position:absolute;left:0;right:0;top:100%");
       await eggAnim(roll,[{transform:"translateY(0)"},{transform:`translateY(-${VH()+320}px)`}],{duration:2600,easing:"linear"});
       const t=eggEl(`<span style="font-family:Cinzel,serif;letter-spacing:.3em;font-weight:700">THE DICE WILL RETURN</span>`,"egg-text","font-size:clamp(15px,4.4vw,28px);color:#ff9a3c");
-      if(soundOn){ const a=ac(); if(a) [36,43].forEach(n=>tone(midi(n),a.currentTime,1.6,"sawtooth",.1,{lp:[200,900],q:2})); }
+      if((sfxGain()>0)){ const a=ac(); if(a) [36,43].forEach(n=>tone(midi(n),a.currentTime,1.6,"sawtooth",.1,{lp:[200,900],q:2})); }
       await eggAnim(t,[{opacity:0,letterSpacing:".8em"},{opacity:1,letterSpacing:".3em"}],{duration:900}); await sleepMs(1100); await eggClear(); },
     async still_watching(){ eggEl("","dim-screen","opacity:.6");
       const m=eggEl(`<h5>Are you still rolling?</h5><p>Three scenes in a row, every one right down to the wire.</p><div><button type="button">Keep rolling</button><button type="button">Just one more</button></div>`,"egg-modal");
@@ -5462,13 +5624,18 @@ footer.note{ display:none; }
     if(!el) return;
     el.classList.remove("fire"); void el.offsetWidth; el.classList.add("fire");
     if(badge && el.dataset.perk){ el.dataset.badge = badge; clearTimeout(el._bt); el._bt = setTimeout(()=>{ delete el.dataset.badge; }, 900); }
-    if(soundOn){ const a=ac(); if(a) tone(midi(72+Math.min(12,(firePerk.n=(firePerk.n||0)+1))),a.currentTime,.09,"triangle",.05); }
+    if((sfxGain()>0)){ const a=ac(); if(a) tone(midi(72+Math.min(12,(firePerk.n=(firePerk.n||0)+1))),a.currentTime,.09,"triangle",.05); }
   }
   async function playChain(trace, gen){
     const rows = (trace||[]).filter(t=>(t.win && t.final>0) || t.push || (t.roll && t.steps && t.steps.length));
     if(!rows.length) return;
     firePerk.n = 0; chainSkip = false;
-    const wait = ms => chainSkip||reduceMotion ? Promise.resolve() : sleepMs(ms);
+    // Options' Game Speed (see speedMult) is a second, independent pacing
+    // knob on top of `pace` below -- `pace` already speeds up a long chain
+    // so it doesn't outstay its welcome; speedMult scales whatever `pace`
+    // lands on down further for a player who wants every chain snappier,
+    // long or short.
+    const wait = ms => chainSkip||reduceMotion ? Promise.resolve() : sleepMs(ms*speedMult());
     const pace = rows.length>4 ? 0.6 : 1.25;
     let running = 0;
     const netEl = ()=>document.getElementById("roll-net");
@@ -5568,12 +5735,12 @@ footer.note{ display:none; }
     if(kind==="roar" && crowd.el.dataset.mood==="fire"){ // phone-camera flashes
       for(let i=0;i<5;i++){ const fl=document.createElement("i"); fl.className="flash"; fl.style.left=(10+Math.random()*80)+"%"; fl.style.animationDelay=(i*0.18)+"s"; crowd.el.appendChild(fl); setTimeout(()=>fl.remove(),1600); }
     }
-    if(soundOn){ const a=ac(); if(a){ try{
+    if((sfxGain()>0)){ const a=ac(); if(a){ try{
       const dur = kind==="groan"?0.9:kind==="roar"?1.6:0.9, len=Math.floor(a.sampleRate*dur);
       const buf=a.createBuffer(1,len,a.sampleRate), d=buf.getChannelData(0);
       for(let i=0;i<len;i++){ const t=i/len; d[i]=(Math.random()*2-1)*Math.sin(Math.PI*t)*(kind==="groan"?1-t*0.5:1); }
       const src=a.createBufferSource(); src.buffer=buf; const f=a.createBiquadFilter(); f.type="bandpass"; f.frequency.value=kind==="groan"?380:900; f.Q.value=0.7;
-      const g=a.createGain(); g.gain.value=(kind==="roar"?0.35:0.18)*(0.4+tableHotness()); src.connect(f); f.connect(g); g.connect(a.destination); src.start();
+      const g=a.createGain(); g.gain.value=(kind==="roar"?0.35:0.18)*(0.4+tableHotness())*sfxGain(); src.connect(f); f.connect(g); g.connect(a.destination); src.start();
     }catch(e){} } }
   }
   window.addEventListener("resize", ()=>syncCrowd());
@@ -5798,9 +5965,81 @@ footer.note{ display:none; }
     });
   }
 
-  function soundBtn(){ return `<button class="icon-btn ${soundOn?"on":""}" id="btn-sound" aria-label="Sound ${soundOn?"on":"off"}" aria-pressed="${soundOn}">${soundOn?"♪":"♪̸"}</button>`; }
+  // Single gear icon, every screen -- opens the Options panel (music/SFX
+  // volume, game speed, pop-ups, film grain), which used to be two separate
+  // icon-btn toggles living right here in the HUD row. See optionsPanelHtml/
+  // renderOptionsBack/wireOptionsPanel just below.
+  function optionsBtn(){ return `<button class="icon-btn" id="btn-options" aria-label="Options" aria-haspopup="dialog">⚙</button>`; }
+  // "░" (a visibly textured/noisy block) reads as grain ON at a glance --
+  // same icon both states, same as the drawer's "≡"; the .icon-btn.on
+  // border/color swap (see CSS) is what actually shows which state you're
+  // in, same convention as every other icon-btn toggle here. Only ever
+  // rendered inside the Options panel now, not its own HUD icon.
+  function grainBtn(){ return `<button class="icon-btn ${grainOff?"":"on"}" id="btn-grain" aria-label="Film grain ${grainOff?"off":"on"}" aria-pressed="${!grainOff}">░</button>`; }
   function wireCommon(){
-    const s = document.getElementById("btn-sound"); if(s) s.onclick = toggleSound;
+    const o = document.getElementById("btn-options"); if(o) o.onclick = ()=>{ optionsOpen = true; render(); };
+  }
+
+  /* ---- Options panel (see optionsOpen) -- lives in the static #options-back
+     div outside #app (same reason as #hold-tip: it has to survive whichever
+     screen's own render() just replaced #app's innerHTML underneath it), so
+     it's built and wired here rather than inside any one renderX(). Called
+     unconditionally at the end of the top-level render() below, so it's
+     always in sync with whichever screen is actually showing. */
+  function optionsPanelHtml(){
+    return `<div class="drawer opt-panel" role="dialog" aria-label="Options" aria-modal="true">
+      <div class="sec-h" style="margin:0"><h3>Options</h3><button class="icon-btn" id="btn-options-close" aria-label="Close">✕</button></div>
+      <div class="opt-block">
+        <label class="opt-label" for="opt-music">Music<span class="opt-val" id="opt-music-val">${musicVol}%</span></label>
+        <input class="opt-range" type="range" id="opt-music" min="0" max="100" step="5" value="${musicVol}">
+      </div>
+      <div class="opt-block">
+        <label class="opt-label" for="opt-sfx">Sound effects<span class="opt-val" id="opt-sfx-val">${sfxVol}%</span></label>
+        <input class="opt-range" type="range" id="opt-sfx" min="0" max="100" step="5" value="${sfxVol}">
+      </div>
+      <div class="opt-block">
+        <span class="opt-label">Game speed</span>
+        <div class="betunit-row">
+          ${GAME_SPEED_TIERS.map(t=>`<button type="button" class="betunit-btn ${gameSpeed===t.id?"active":""}" data-speed="${t.id}">${t.label}</button>`).join("")}
+        </div>
+      </div>
+      <div class="opt-block opt-row">
+        <span class="opt-label" style="margin:0">Pop-ups <small>score toasts &amp; celebration cards</small></span>
+        <button class="icon-btn ${popupsOn?"on":""}" id="btn-popups" aria-label="Pop-ups ${popupsOn?"on":"off"}" aria-pressed="${popupsOn}">${popupsOn?"◆":"◇"}</button>
+      </div>
+      <div class="opt-block opt-row">
+        <span class="opt-label" style="margin:0">Film grain</span>
+        ${grainBtn()}
+      </div>
+    </div>`;
+  }
+  function renderOptionsBack(){
+    const back = document.getElementById("options-back"); if(!back) return;
+    if(!optionsOpen){ back.hidden = true; back.innerHTML = ""; return; }
+    back.hidden = false;
+    back.innerHTML = optionsPanelHtml();
+    wireOptionsPanel(back);
+  }
+  function wireOptionsPanel(back){
+    const close = document.getElementById("btn-options-close"); if(close) close.onclick = ()=>{ optionsOpen = false; render(); };
+    // Assigned, not addEventListener -- #options-back is a static node that
+    // outlives every render (see the HTML comment above it), so an
+    // addEventListener here would stack a new listener on top of the old
+    // one every time this function re-runs instead of replacing it.
+    back.onclick = e=>{ if(e.target===back){ optionsOpen = false; render(); } };
+    // The two volume sliders update their own label text and persist
+    // directly on "input", deliberately WITHOUT calling render() -- a full
+    // innerHTML rebuild mid-drag (this panel included) would tear down and
+    // recreate the <input> the pointer is still holding, breaking the drag.
+    // Nothing else on screen depends on the live volume number, so there's
+    // nothing else that needs to re-render while dragging.
+    const mi = document.getElementById("opt-music");
+    if(mi) mi.oninput = e=>{ setMusicVol(+e.target.value); const lbl=document.getElementById("opt-music-val"); if(lbl) lbl.textContent = musicVol+"%"; };
+    const si = document.getElementById("opt-sfx");
+    if(si) si.oninput = e=>{ setSfxVol(+e.target.value); const lbl=document.getElementById("opt-sfx-val"); if(lbl) lbl.textContent = sfxVol+"%"; };
+    back.querySelectorAll("[data-speed]").forEach(btn=>{ btn.onclick = ()=> setGameSpeed(btn.dataset.speed); });
+    const pu = document.getElementById("btn-popups"); if(pu) pu.onclick = togglePopups;
+    const gr = document.getElementById("btn-grain"); if(gr) gr.onclick = toggleGrain;
   }
   function roundDots(){
     return BLIND_TIERS.map((t,i)=>`<span class="round-dot ${i<state.tierIdx?"done":""} ${i===state.tierIdx?"active":""}" title="${t.label}"></span>`).join("");
@@ -5820,7 +6059,7 @@ footer.note{ display:none; }
         <div class="hud-left">
           <span class="hud-scene">Act <b>${info.roman}</b> · Sc <b>${info.scene}/${info.sceneCount}</b> · <b>${tier.label}</b> ${roundDots()}</span>
         </div>
-        <div class="hud-tools">${soundBtn()}${opts.menu?`<button class="icon-btn" id="btn-drawer" aria-label="Dice, stats and log">≡</button>`:""}</div>
+        <div class="hud-tools">${optionsBtn()}${opts.menu?`<button class="icon-btn" id="btn-drawer" aria-label="Dice, stats and log">≡</button>`:""}</div>
       </div>
       <div class="hud-row2">
         <div><div class="bud-top"><span class="lbl">Bankroll</span><b id="hud-budget">${fmtU(state.score)}</b><span class="tgt">/ ${fmtU(state.target)}u</span></div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div></div>
@@ -5852,13 +6091,40 @@ footer.note{ display:none; }
     if(el && boss) wireHoldTip(el, boss.name, bossDescFor(boss));
   }
 
+  // "Next: <Boss>" banner -- this ante's boss (see beginScreening's
+  // tierIdx-0 draw and freshState's comment on state.bossId), advertised
+  // from the start of the ante so every shop visit within it can actually
+  // be spent getting ready for it. Callers decide WHEN to show it, this
+  // only decides WHETHER there's anything to show: null exactly during the
+  // one shop visit right after beating a boss, before the next ante's own
+  // draw has run yet (see settleRound's ante-wrap), and non-null for the
+  // rest of the ante after that -- including the shop sitting directly in
+  // front of the boss round itself (tierIdx already 2 there, same as the
+  // boss round's own screens -- so renderShop always calls this
+  // unconditionally, it's still a real preview, not a stale one). Only the
+  // Next Up screen (renderBlindSelect) needs to gate its own call on
+  // tierIdx<2, since tier 2's Next Up already has its own full-size reveal
+  // (see the local `boss` var there) and would otherwise show the same
+  // boss twice.
+  function bossPreviewStrip(){
+    if(!state.bossId) return "";
+    const boss = BOSS_BLINDS.find(b=>b.id===state.bossId);
+    if(!boss) return "";
+    return `<div class="boss-strip boss-preview" id="boss-preview-strip"><b>Next: ${boss.name}</b> &mdash; ${bossDescFor(boss)}</div>`;
+  }
+  function wireBossPreviewTip(){
+    const el = document.getElementById("boss-preview-strip");
+    const boss = state.bossId ? BOSS_BLINDS.find(b=>b.id===state.bossId) : null;
+    if(el && boss) wireHoldTip(el, boss.name, bossDescFor(boss));
+  }
+
   function renderTitle(){
     const th = curTheme();
     const hasSave = state.highestAnte>1 || state.payroll!==0 || (state.rollNumber||0)>0;
     const found = eggsFound();
     root.innerHTML = `
       <div class="title-screen">
-        <div style="position:absolute;top:10px;right:10px">${soundBtn()}</div>
+        <div style="position:absolute;top:10px;right:10px;display:flex;gap:6px">${optionsBtn()}</div>
         <div class="now-playing">Now showing · Era ${th.n} · ${th.name}</div>
         <div class="title-dice"><div class="die">${dieFaceSVG(6)}</div><div class="die">${dieFaceSVG(1)}</div></div>
         <h1 class="title-marquee">Leading Roll</h1>
@@ -6010,7 +6276,7 @@ footer.note{ display:none; }
     const pickedIdx = picked ? unlockedEraIdxFor(picked.id) : 0;
     root.innerHTML = `
       <div class="screen">
-        <div class="hud"><div class="hud-row1"><div class="hud-left"><span class="brand-mini">Casting Call</span><span class="hud-scene">Pick your lead · ${unlockedCount}/${CHARACTER_ORDER.length} cast</span></div><div class="hud-tools">${soundBtn()}</div></div></div>
+        <div class="hud"><div class="hud-row1"><div class="hud-left"><span class="brand-mini">Casting Call</span><span class="hud-scene">Pick your lead · ${unlockedCount}/${CHARACTER_ORDER.length} cast</span></div><div class="hud-tools">${optionsBtn()}</div></div></div>
         <div class="pick-grid c2">
           ${visibleIds.map(id=>{ const c = CHARACTERS[id];
             return `<button class="pick ${state.pendingCharacterId===id?"on":""}" data-character="${id}"><b>${c.name.replace(/^The /,"")}</b><span>${c.tagline}</span></button>`; }).join("")}
@@ -6043,7 +6309,7 @@ footer.note{ display:none; }
     const d = DIFFICULTIES[pickedId], th = ERA_THEMES[pickedId];
     root.innerHTML = `
       <div class="screen">
-        <div class="hud"><div class="hud-row1"><div class="hud-left"><span class="brand-mini">Pick Your Era</span><span class="hud-scene">${character?character.name:"Your lead"} · ${unlockedIdx+1}/${DIFFICULTY_ORDER.length} unlocked</span></div><div class="hud-tools">${soundBtn()}</div></div></div>
+        <div class="hud"><div class="hud-row1"><div class="hud-left"><span class="brand-mini">Pick Your Era</span><span class="hud-scene">${character?character.name:"Your lead"} · ${unlockedIdx+1}/${DIFFICULTY_ORDER.length} unlocked</span></div><div class="hud-tools">${optionsBtn()}</div></div></div>
         <div class="pick-grid c3">
           ${visibleEraIds.map(id=>{ const t = ERA_THEMES[id];
             return `<button class="pick ${pickedId===id?"on":""}" data-difficulty="${id}"><span class="en">Era ${t.n}</span><b>${t.name}</b><span>${t.years}</span></button>`; }).join("")}
@@ -6418,6 +6684,7 @@ footer.note{ display:none; }
       <div class="screen">
         <div class="big-head">${boss ? boss.name : tier.label}</div>
         <div class="sub-c">${boss ? `<b style="color:var(--marquee-red-bright)">Director's Cut twist:</b> ${bossDescFor(boss)}` : "Hit the Target before your Bankroll runs dry."}</div>
+        ${state.tierIdx<2 ? bossPreviewStrip() : ""}
         <div class="mini-stats">
           <div><span class="lbl">Target</span><b>${fmtU(state.target)}u</b></div>
           <div><span class="lbl">Stipend</span><b style="color:var(--emerald-bright)">+${state.lastSceneStipend||0}u</b></div>
@@ -6428,7 +6695,7 @@ footer.note{ display:none; }
         <div class="actionbar two"><span></span><button class="btn btn-primary btn-roll" id="btn-action">Action! &rarr;</button></div>
       </div>`;
     document.getElementById("btn-action").onclick = actionRoll;
-    wireOwnedTips(); wireCommon();
+    wireOwnedTips(); wireCommon(); wireBossPreviewTip();
   }
 
   // The shop -- named and dressed for the run's Era, every offer a compact
@@ -6440,7 +6707,7 @@ footer.note{ display:none; }
       <div class="hud">
         <div class="hud-row1">
           <div class="hud-left"><span class="hud-scene">Wrap Party · between scenes</span><span class="shop-name">${th.shop}</span></div>
-          <div class="hud-tools">${soundBtn()}</div>
+          <div class="hud-tools">${optionsBtn()}</div>
         </div>
         <div class="hud-row2" style="grid-template-columns:auto auto auto minmax(0,1fr)">
           <div class="mini-stat payroll"><span class="lbl">Payroll</span><b style="font-size:17px">${fmtU(state.payroll)}u</b></div>
@@ -6450,6 +6717,7 @@ footer.note{ display:none; }
         </div>
       </div>
       <div class="screen" style="gap:8px">
+        ${bossPreviewStrip()}
         <div class="sec">
           <div class="sec-h">Shop <small>hold a card for details</small><button class="tool-btn" id="btn-reroll-shop" ${state.payroll>=state.shopRerollCost?"":"disabled"}>Reroll ${state.shopRerollCost}u</button></div>
           ${state.pendingDiceBuy!=null ? `
@@ -6483,9 +6751,11 @@ footer.note{ display:none; }
               }
               const def = DIE_KINDS[offer.dieKind];
               if(!def) return `<div class="offer sold">sold</div>`;
-              const tier = DICE_SHOP_LEGENDARY_POOL.includes(offer.dieKind)?"Legendary":DICE_SHOP_ULTRA_RARE_POOL.includes(offer.dieKind)?"Ultra-rare":DICE_SHOP_RARE_POOL.includes(offer.dieKind)?"Rare":"Die";
-              return `<div class="offer" style="--genre-color:${def.tint||"var(--gold)"}" data-tip-shop="${idx}">
-                <span class="g-tag">${tier}</span>
+              // See dieRarityColorFor's own comment -- label is always just
+              // "Die" now, the card's border color is what tells rarity
+              // apart.
+              return `<div class="offer" style="--genre-color:${dieRarityColorFor(offer.dieKind)}" data-tip-shop="${idx}">
+                <span class="g-tag">Die</span>
                 <span class="o-name">${def.name}</span>
                 <button class="buy" data-buy-shop="${idx}" ${state.payroll>=def.cost?"":"disabled"}>${def.cost}u</button>
               </div>`;
@@ -6514,7 +6784,7 @@ footer.note{ display:none; }
       else if(offer.kind==="felt"){ const zone = FELT_ZONE_BY_ID[offer.zoneId]; if(zone) wireHoldTip(card, zone.label, feltTipDesc(offer.zoneId)); }
       else if(offer.kind==="die"){ const def = DIE_KINDS[offer.dieKind]; if(def) wireHoldTip(card, def.name, def.desc); }
     });
-    wireOwnedTips(); wireCommon();
+    wireOwnedTips(); wireCommon(); wireBossPreviewTip();
   }
 
   function renderEnd(){
@@ -6555,7 +6825,7 @@ footer.note{ display:none; }
   function render(){
     if(state.screen!=="play"){ drawerOpen = false; abandonConfirming = false; }
     applyTheme();
-    if(state.dieLostPrompt){ renderDieLostPrompt(); try{ syncCrowd(); }catch(e){} return; }
+    if(state.dieLostPrompt){ renderDieLostPrompt(); renderOptionsBack(); try{ syncCrowd(); }catch(e){} return; }
     if(state.screen==="title") renderTitle();
     else if(state.screen==="tutorial") renderTutorial();
     else if(state.screen==="character") renderCharacterSelect();
@@ -6565,6 +6835,12 @@ footer.note{ display:none; }
     else if(state.screen==="shop"){ renderShop(); if(render._shopKey!==state.ante+":"+state.tierIdx){ render._shopKey=state.ante+":"+state.tierIdx; armPostCredits(); } }
     else if(state.screen==="end") renderEnd();
     if(state.screen!=="shop") render._shopKey = null;
+    // Rendered unconditionally, same as applyTheme above -- #options-back
+    // lives outside #app (see its static HTML) so it survives whichever
+    // screen's renderX() just replaced #app's innerHTML, and needs its own
+    // refresh call here to stay in sync (open/closed, current slider/speed
+    // values) regardless of which screen that was.
+    renderOptionsBack();
     try{ syncCrowd(); }catch(e){}
   }
 
