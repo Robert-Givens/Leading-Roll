@@ -1246,6 +1246,20 @@ footer.note{ display:none; }
     { id:"lens_macro", type:"lens", name:"Macro Lens", cost:7,
       desc:"Hardway bets pay double.",
       onPayout:(ctx)=>{ if(ctx.betType==="hard") ctx.amount *= 2; } },
+    // Macro Lens's own Prop-bet mirror -- before this, the only place a
+    // Lens item even mentioned props at all was Instant Replay's shared
+    // Place/hardway/prop retrigger, below, so a build actually built around
+    // one-roll props (Snake Eyes, Boxcars, Any Craps, Any 7) had no
+    // dedicated payout lever of its own the way Hardways (Macro Lens),
+    // Field (Wide Angle) and Dealer Bets (Telephoto) already did. Priced a
+    // full 2u above Macro Lens rather than matching it outright: Snake Eyes
+    // and Boxcars already pay 30x stake (PROP_PAYOUTS) against a hardway's
+    // 7-9x (HARDWAY_PAYOUTS), so the same flat double lands a much bigger
+    // ceiling here -- a first-balance-pass estimate (no sim harness run for
+    // this one specifically), easy to retune here if it proves too strong.
+    { id:"lens_freeze_frame", type:"lens", name:"Freeze Frame", cost:9,
+      desc:"Prop bets pay double.",
+      onPayout:(ctx)=>{ if(ctx.betType==="prop") ctx.amount *= 2; } },
     { id:"lens_telephoto", type:"lens", name:"Telephoto", cost:6,
       desc:"Dealer Bets pay out 20% higher.",
       onPayout:(ctx)=>{ if(ctx.betType==="place") ctx.amount = Math.round(ctx.amount*1.2); } },
@@ -1587,17 +1601,47 @@ footer.note{ display:none; }
   // like it used to be, so this sits much lower than before to land on a
   // similar per-scene frequency. This is the Act 1 rate; see
   // DIE_LOSS_CHANCE_BY_ACT below for how it climbs from here.
-  const DIE_LOSS_CHANCE = 0.05;
+  // Halved (0.05 -> 0.025) so a flat scene opens noticeably safer -- see
+  // DIE_RISK_STREAK_GROWTH/DIE_LOSS_STREAK_CAP just below for the other half
+  // of this change: what used to be a flat per-roll rate is now just the
+  // FLOOR, and only climbs back up as a scene's own roll history earns it.
+  const DIE_LOSS_CHANCE = 0.025;
   // Ramps up by Act instead of sitting flat for the whole run. A build
   // that's locked in a guaranteed-hit combo (two restricted-face dice --
   // Tri, Even Cut, Odd Take, any Typecast, or a rare compound of one --
   // sharing the numbers you're betting) gets punished for staying that way
   // as the run goes on: every extra roll is another shot at losing the
   // exact die making it work. First-balance pass, easy to retune here.
-  const DIE_LOSS_CHANCE_BY_ACT = { 1:0.05, 2:0.08, 3:0.12 };
+  // Each value halved along with DIE_LOSS_CHANCE above, same reasoning.
+  const DIE_LOSS_CHANCE_BY_ACT = { 1:0.025, 2:0.04, 3:0.06 };
   function dieLossChanceFor(ante){
-    return DIE_LOSS_CHANCE_BY_ACT[actInfo(ante).act] != null ? DIE_LOSS_CHANCE_BY_ACT[actInfo(ante).act] : DIE_LOSS_CHANCE;
+    // Act 3's own rate is also Endless's plateau (Act 4+, see actInfo) --
+    // there's no Act 4/5/6... entry to look up, and letting the lookup miss
+    // and silently fall back to the flat pre-Act DIE_LOSS_CHANCE would make
+    // Endless play EASIER than the run's own final stretch, backwards for a
+    // "how far can you go" mode. min(act,3) pins it at the hardest rate
+    // instead, same spirit as SCENE_STIPEND_BY_ACT's own clamp just below.
+    const act = Math.min(actInfo(ante).act, 3);
+    return DIE_LOSS_CHANCE_BY_ACT[act] != null ? DIE_LOSS_CHANCE_BY_ACT[act] : DIE_LOSS_CHANCE;
   }
+  // The other half of "halve the base rate, then let it grow" (see
+  // DIE_LOSS_CHANCE above): every consecutive roll THIS SCENE that lands on
+  // neither a seven nor a sum already seen since the last reset (see
+  // maybeLoseDie's own comment on state.dieRiskStreak/state.dieRiskSeenSums)
+  // adds this much on top of the base rate -- a "hot" streak of fresh
+  // numbers is exactly when a real table's tension (and a real chance of
+  // fumbling a die) would be climbing. A seven or a repeated sum resets the
+  // streak back to 0, so the danger only ever builds during a genuinely
+  // unbroken run of new numbers, never just from rolls piling up. There are
+  // only 10 non-seven sums (2-6, 8-12) to draw from, so the streak is
+  // mathematically capped at 10 on its own -- the 11th roll of any unbroken
+  // streak MUST repeat one of the 10 or land on 7, either of which resets
+  // it. DIE_LOSS_STREAK_CAP is a second, explicit ceiling on the total
+  // chance regardless, so a maxed-out streak stays a real, elevated risk
+  // without ever approaching a coin flip. First-balance pass (0.02/roll,
+  // capped at 0.35 total), easy to retune here.
+  const DIE_RISK_STREAK_GROWTH = 0.02;
+  const DIE_LOSS_STREAK_CAP = 0.35;
 
   // Eras (Balatro's "Stakes," reskinned): chosen once, at the very start of
   // a run (see renderDifficultySelect/startRun), and never change mid-run.
@@ -1974,13 +2018,42 @@ footer.note{ display:none; }
     return 3 + ante + tierIdx;
   }
 
-  // Screenplay-style Act structure: Act I = Ante 1-3, Act II = 4-6, Act III = 7-8.
+  // Small-number-only Roman numeral formatter -- Act I/II/III never needed
+  // this (see the plain ternary this replaced), but Endless (state.
+  // endlessMode, see actInfo below) can reach Act IV, V, VI... with no
+  // ceiling, so this covers that range too rather than hand-listing more
+  // ternaries. Never needs to represent 0 or a negative -- actInfo's own
+  // act is always >=1.
+  function toRoman(n){
+    const steps = [[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]];
+    let out = "";
+    steps.forEach(([v,sym])=>{ while(n>=v){ out += sym; n -= v; } });
+    return out;
+  }
+  // Screenplay-style Act structure: Act I = Ante 1-3, Act II = 4-6, Act III
+  // = 7-8. Ante can run past MAX_ANTE (8) in Endless (see state.endlessMode,
+  // set from the win screen's Keep Rolling button) -- rather than stop the
+  // Act/Scene readout at Act III forever, every further 3 antes forms
+  // another Act (IV, V, VI, ...), same 3-scene shape Act I/II already use,
+  // with no ceiling on how many. Nothing else about a run's difficulty
+  // curve is defined per-Act any more once past Act III -- see
+  // DIE_LOSS_CHANCE_BY_ACT/SCENE_STIPEND_BY_ACT, both of which plateau at
+  // their own Act 3 numbers instead of trying to extend a 1/2/3 table
+  // forever -- Target (targetFor) is what actually keeps climbing in
+  // Endless, straight off the ante number itself, not off the Act.
   function actInfo(ante){
     let act, sceneStart, sceneCount;
     if(ante<=3){ act=1; sceneStart=1; sceneCount=3; }
     else if(ante<=6){ act=2; sceneStart=4; sceneCount=3; }
-    else { act=3; sceneStart=7; sceneCount=2; }
-    return { act, roman: act===1?"I":act===2?"II":"III", scene: ante-sceneStart+1, sceneCount };
+    else if(ante<=MAX_ANTE){ act=3; sceneStart=7; sceneCount=2; }
+    else {
+      const pastAntes = ante - MAX_ANTE - 1; // 0-based antes into Endless
+      const actsPast = Math.floor(pastAntes/3);
+      act = 4 + actsPast;
+      sceneStart = MAX_ANTE + 1 + actsPast*3;
+      sceneCount = 3;
+    }
+    return { act, roman: toRoman(act), scene: ante-sceneStart+1, sceneCount };
   }
 
   // Scene Stipend: does double duty at the START of every scene (see
@@ -1998,7 +2071,12 @@ footer.note{ display:none; }
   // settleRound/interestFor) are still what actually builds it up over a run.
   const SCENE_STIPEND_BY_ACT = { 1:6, 2:10, 3:14 };
   function sceneStipendFor(ante){
-    let s = SCENE_STIPEND_BY_ACT[actInfo(ante).act] || 6;
+    // Same Act-3 plateau as dieLossChanceFor, and for the same reason: an
+    // unclamped lookup misses on Act 4+ (Endless, see actInfo) and falls
+    // back to the ||6 below, which would actually CUT Endless's stipend
+    // back down from Act 3's 14 to Act 1's 6 the moment Ante 9 hits --
+    // clamping to Act 3 keeps it flat at the run's highest stipend instead.
+    let s = SCENE_STIPEND_BY_ACT[Math.min(actInfo(ante).act, 3)] || 6;
     const character = CHARACTERS[state.characterId];
     if(character && character.stipendMult) s = Math.round(s*character.stipendMult);
     return s;
@@ -2110,6 +2188,19 @@ footer.note{ display:none; }
       // this -- Payroll hitting 0 is never a loss condition at all).
       target:10+targetFor(1,0),
       bossId:null,
+      // Every boss id drawn so far this run (see beginScreening's own
+      // no-repeat draw and bossPoolFor) -- cleared back to empty once every
+      // currently-unlocked boss has come up, so a long or endless run never
+      // runs dry, it just starts a fresh lap through the same pool instead
+      // of ever repeating a boss it could still avoid.
+      seenBossIds:[],
+      // Set once, from the win screen's "Keep Rolling" button (see
+      // renderEnd/settleRound) -- true means Ante 9+ no longer ends the run,
+      // it just keeps going: Target (targetFor), the boss pool and the
+      // Act/Scene readout (actInfo) all already scale cleanly past
+      // MAX_ANTE on their own, so this flag is the only thing settleRound
+      // actually needs to check.
+      endlessMode:false,
       rollNumber:0,
       log:[],
       lastRoll:null,      // {a,b,hand,netThisRoll} -- hand is flavor color-commentary only; netThisRoll is this roll's real net units across every bet resolved
@@ -2192,6 +2283,18 @@ footer.note{ display:none; }
       // entirely so the Retake button's own re-enable logic (which keys off
       // lastRoll being non-null) is untouched.
       lastRollWasSeven: false,
+      // The growing half of the die-loss mechanic (see DIE_RISK_STREAK_
+      // GROWTH/maybeLoseDie): dieRiskStreak counts consecutive REAL rolls
+      // this scene (a roll a die falling off erases doesn't count -- same
+      // "never happened" treatment rollNumber/rollsSincePoint already get)
+      // that landed on neither a seven nor a sum already in
+      // dieRiskSeenSums. Either one resets both fields back to their
+      // freshState defaults; otherwise the sum gets added and the streak
+      // grows by one. Reset every fresh scene (beginScreening) and rolled
+      // back on a Retake (see doRoll's lastRollSnapshot/doRetake), same
+      // full time-jump-back treatment rollsSincePoint/lastRollWasSeven get.
+      dieRiskStreak: 0,
+      dieRiskSeenSums: [],
       scriptNote: null,     // one-line callout when an equipped Script item fires
       bossDisabledSlot: null, // which equip slot ("film"/"script"/"lens"/"cast") the Director's Notes boss shut down this roll -- null otherwise
       bossNote: null,          // one-line callout when a boss blind's own effect fires (parallel to scriptNote/castNote)
@@ -3016,6 +3119,12 @@ footer.note{ display:none; }
     state.doublesThisScene = 0;
     state.photoFinishUsed = false;
     state.lastRollWasSeven = false; // Franchise Fatigue resets per scene, same as Cold Open/Chekhov's Gun/Plot Armor above
+    // Same per-scene reset as lastRollWasSeven just above, for the same
+    // reason: a fresh table means the "how long since a seven or a repeat"
+    // clock (see maybeLoseDie/DIE_RISK_STREAK_GROWTH) starts back at zero
+    // rather than carrying a hot streak in from the scene that just ended.
+    state.dieRiskStreak = 0;
+    state.dieRiskSeenSums = [];
     state.removeMode = false; // see freshState's own comment -- never carries into a fresh table
     state.betUnit = 1; // chip denomination never carries into a fresh table either -- see freshState's own comment on betUnit
     // Heat, stuntDoubleUsed and winStreak are run-wide, not scene-wide --
@@ -3029,8 +3138,20 @@ footer.note{ display:none; }
     }
     if(state.tierIdx===2){
       const pool = bossPoolFor();
-      state.bossId = pool[Math.floor(Math.random()*pool.length)].id;
-      const boss = BOSS_BLINDS.find(x=>x.id===state.bossId);
+      // Never draw a boss this run has already seen while there's still an
+      // unseen one available (the actual bug report this fixes: the same
+      // boss coming up more than once in one run) -- same "bag, refill on
+      // empty" shape as drawEquipOffer's own no-repeat draw. The bag empties
+      // once every currently-unlocked boss has shown up (which, in Endless
+      // -- see state.endlessMode -- it eventually will, repeatedly), and
+      // clearing it back to [] just starts a fresh lap through the same
+      // pool rather than ever forcing a true repeat while an unseen option
+      // still exists.
+      let unseen = pool.filter(b=>!state.seenBossIds.includes(b.id));
+      if(!unseen.length){ state.seenBossIds = []; unseen = pool; }
+      const boss = unseen[Math.floor(Math.random()*unseen.length)];
+      state.bossId = boss.id;
+      state.seenBossIds.push(boss.id);
       if(boss.retakeAdjust) state.retakesLeft = Math.max(0, state.retakesLeft + boss.retakeAdjust);
     }
   }
@@ -3227,10 +3348,28 @@ footer.note{ display:none; }
   // `(n>=0?"+":"")+fmtU(n)` never double-signs.
   function fmtU(n){
     n = Math.round(n||0);
+    // Endless (state.endlessMode, see actInfo/settleRound) never caps
+    // Target's own growth curve, so this is the one place that has to keep
+    // up with it however big it gets. `n||0` above already turns a stray
+    // NaN into a clean 0; this catches the only other way a huge-but-legit
+    // number could still go bad -- true overflow into +/-Infinity -- so the
+    // HUD prints "∞" instead of the literal string "Infinity" if a number
+    // somehow ever gets there, rather than however Math.round/toFixed would
+    // otherwise mangle it. Neither branch should be reachable through
+    // ordinary play (every real add-site keeps its inputs finite), this is
+    // belt-and-suspenders so the display can never actually break.
+    if(!isFinite(n)) return n<0 ? "-∞" : "∞";
     const neg = n<0;
     const abs = Math.abs(n);
     let out;
-    if(abs>=1e9) out = trimDec(abs/1e9)+"b";
+    // t (trillion) covers anything a genuinely long Endless run plausibly
+    // reaches; past that, a fixed unit suffix would just keep needing a new
+    // letter forever, so it switches to compact scientific notation instead
+    // -- still a short, readable string at any magnitude, never a raw wall
+    // of digits.
+    if(abs>=1e15) out = abs.toExponential(2).replace("e+","e");
+    else if(abs>=1e12) out = trimDec(abs/1e12)+"t";
+    else if(abs>=1e9) out = trimDec(abs/1e9)+"b";
     else if(abs>=1e6) out = trimDec(abs/1e6)+"m";
     else if(abs>=1e3) out = trimDec(abs/1e3)+"k";
     else out = String(abs);
@@ -3930,12 +4069,21 @@ footer.note{ display:none; }
   // Returns the DIE_KINDS entry for whichever die got swapped out, or null
   // if nothing happened this roll (including "everyone left standing is
   // already a stand-in, so there was nothing at risk to check").
-  function maybeLoseDie(){
+  function maybeLoseDie(sum){
     const active = getActiveDice().filter(d=>!state.sidelinedDice.some(s=>s.uid===d.uid));
     if(!active.length) return null;
     const victim = active[Math.floor(Math.random()*active.length)];
     const kindDef = DIE_KINDS[victim.kind];
-    let chance = dieLossChanceFor(state.ante);
+    // Base/Act-scaled rate is now just the floor -- the longer this scene
+    // goes without a seven or a repeated sum (state.dieRiskStreak, see
+    // freshState/beginScreening's per-scene reset and doRoll/doRetake's
+    // snapshot), the more nervous the table gets and the more that floor
+    // climbs, capped so a long clean streak can heat up but never makes a
+    // die loss near-certain. lossGuard/dieLossMult still apply on top of
+    // that capped number, same as they always applied to the flat base rate
+    // -- so a lossGuard die still meaningfully cuts its own risk even at a
+    // maxed-out streak, not just at the calmer, low-streak numbers.
+    let chance = Math.min(DIE_LOSS_STREAK_CAP, dieLossChanceFor(state.ante) + state.dieRiskStreak*DIE_RISK_STREAK_GROWTH);
     if(kindDef && kindDef.lossGuard) chance *= kindDef.lossGuard;
     const character = CHARACTERS[state.characterId];
     if(character && character.dieLossMult) chance *= character.dieLossMult;
@@ -3965,6 +4113,21 @@ footer.note{ display:none; }
         gainHeat(1);
       }
       return kindDef;
+    }
+    // No die lost -- this was a real roll (a die-loss roll "never happened",
+    // see doRoll's own comment at the call site, so it must not touch the
+    // streak either way). A seven or a sum this scene has already seen
+    // breaks the nerves and resets the clock back to the floor; anything
+    // else is one more clean roll, so the streak grows and the sum joins
+    // the seen list. Only 10 non-seven sums exist (2,3,4,5,6,8,9,10,11,12),
+    // so dieRiskSeenSums self-caps there even before DIE_LOSS_STREAK_CAP
+    // stops the chance itself from climbing any further.
+    if(sum===7 || state.dieRiskSeenSums.includes(sum)){
+      state.dieRiskStreak = 0;
+      state.dieRiskSeenSums = [];
+    } else {
+      state.dieRiskStreak += 1;
+      state.dieRiskSeenSums.push(sum);
     }
     return null;
   }
@@ -4032,6 +4195,12 @@ footer.note{ display:none; }
       // roll happens, so a Retake can restore it to what it was BEFORE the
       // roll being undone rather than guessing.
       lastRollWasSeven: state.lastRollWasSeven,
+      // Same full-time-jump-back treatment for the die-risk streak (see
+      // maybeLoseDie) -- captured right before this roll happens so a
+      // Retake restores it to whatever it was BEFORE the roll being undone,
+      // not whatever it became once that roll's sum landed (or stays put
+      // if the undone roll was itself a die-loss, which never touched it).
+      dieRiskStreak: state.dieRiskStreak, dieRiskSeenSums: [...state.dieRiskSeenSums],
     };
     state.rolling = true;
     render();
@@ -4103,7 +4272,7 @@ footer.note{ display:none; }
         // below gets touched at all, see maybeLoseDie) and rollNumber /
         // rollsSincePoint don't advance either, so Cold Open and Chekhov's
         // Gun stay lined up on the next REAL roll.
-        const lostDie = maybeLoseDie();
+        const lostDie = maybeLoseDie(sum);
         if(lostDie){
           state.lastRoll = { a, b, hand, noRoll:true };
           state.lastBetNote = null;
@@ -4292,6 +4461,12 @@ footer.note{ display:none; }
       // field's own comment in freshState for why) so this doesn't need to
       // touch state.lastRoll's unconditional reset just below at all.
       state.lastRollWasSeven = !!snap.lastRollWasSeven;
+      // Same full-time-jump-back restore for the die-risk streak (see
+      // maybeLoseDie/doRoll's snapshot above) -- a Retake undoes whatever
+      // that roll's sum did to the streak (grew it, or reset it on a seven
+      // or a repeat) right along with the bets and score.
+      state.dieRiskStreak = snap.dieRiskStreak||0;
+      state.dieRiskSeenSums = snap.dieRiskSeenSums ? [...snap.dieRiskSeenSums] : [];
     }
     const character = CHARACTERS[state.characterId];
     if(character && character.freeRetakeEachScene && !state.freeRetakeUsedThisScene){
@@ -4341,7 +4516,11 @@ footer.note{ display:none; }
       state.highestAnte = state.ante;
       restockIfNewAct();
     }
-    if(state.ante>MAX_ANTE){
+    // Ante 9+ only ends the run the FIRST time through -- once Endless has
+    // been switched on (see the win screen's "Keep Rolling" button and
+    // enterShop below), wrapping Ante 8 just rolls straight into the next
+    // ante's shop like any other, instead of hitting this branch again.
+    if(state.ante>MAX_ANTE && !state.endlessMode){
       state.won = true;
       state.screen = "end";
       // Era progression lives outside the run save entirely (see
@@ -4357,6 +4536,15 @@ footer.note{ display:none; }
       render(); saveState();
       return;
     }
+    enterShop();
+  }
+
+  // The shop-transition tail shared by a normal scene clear (settleRound,
+  // right above) and by clicking "Keep Rolling" on the win screen
+  // (renderEnd) -- turning Endless on doesn't replay any part of the scene
+  // that was already cleared, it just lets THIS run straight into the next
+  // ante's shop instead of stopping at the win screen.
+  function enterShop(){
     // Put back any die that rolled off the table this scene BEFORE the shop
     // offers get rolled -- see restoreSidelinedDice(). Both this call and
     // rollShopOffers() (right below) need state.dicePool holding everyone's
@@ -6345,13 +6533,21 @@ footer.note{ display:none; }
           <div><span class="lbl">Payroll</span><b>${fmtU(state.payroll)}u</b></div>
         </div>
         <div class="title-btns">
+          ${state.won && !state.endlessMode ? `<button class="btn btn-emerald" id="btn-endless">Keep Rolling &infin;</button>` : ""}
           ${!state.won ? `<button class="btn btn-primary" id="btn-retry">Retry</button>` : ""}
           <button class="btn ${state.won?'btn-gold':'btn-ghost'}" id="btn-restart">Roll Again</button>
         </div>
+        ${state.won && !state.endlessMode ? `<p class="subtitle" style="font-size:11.5px">No more antes after this one -- Keep Rolling lets the same run carry on past Ante ${MAX_ANTE} instead, Target and the boss pool both still climbing, for as long as you can hold on.</p>` : ""}
       </div>`;
     document.getElementById("btn-restart").onclick = restart;
     const retryBtn = document.getElementById("btn-retry");
     if(retryBtn) retryBtn.onclick = retryRun;
+    // Keep Rolling: same run, same equipment and Payroll, just doesn't stop
+    // here -- flips endlessMode on (see settleRound's own comment) and
+    // drops straight into the next ante's shop, same tail a real scene
+    // clear lands on (enterShop, see settleRound).
+    const endlessBtn = document.getElementById("btn-endless");
+    if(endlessBtn) endlessBtn.onclick = ()=>{ state.endlessMode = true; enterShop(); };
     if(state.won && !renderEnd._burst){ renderEnd._burst = true; setTimeout(()=>{ burst(th.parts, innerWidth/2, innerHeight*.35, 90); sting("big"); }, 200); }
     if(!state.won) renderEnd._burst = false;
   }
